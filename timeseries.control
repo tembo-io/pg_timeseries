@@ -1,0 +1,5 @@
+# time series extension
+comment = 'Convenience API for Tembo time series stack'
+default_version = '0.1.0'
+module_pathname = '$libdir/timeseries'
+requires = 'pg_partman'

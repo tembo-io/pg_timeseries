@@ -1,0 +1,142 @@
+\set SHOW_CONTEXT never
+BEGIN;
+CREATE SCHEMA partman;
+CREATE EXTENSION IF NOT EXISTS pg_partman WITH SCHEMA partman CASCADE;
+CREATE EXTENSION timeseries;
+ROLLBACK;
+CREATE EXTENSION timeseries CASCADE;
+NOTICE:  installing required extension "pg_partman"
+CREATE TABLE simple ();
+SELECT enable_ts_table('simple');
+ERROR:  could not enable time-series enhancements
+DETAIL:  Target table was not partitioned
+HINT:  Recreate table using PARTITION BY RANGE
+CREATE TABLE hash ( username text ) PARTITION BY HASH (username);
+SELECT enable_ts_table('hash');
+ERROR:  could not enable time-series enhancements
+DETAIL:  Target table not range-partitioned
+HINT:  Recreate table using PARTITION BY RANGE
+CREATE TABLE nullable ( anniversary date ) PARTITION BY RANGE (anniversary);
+SELECT enable_ts_table('nullable');
+ERROR:  could not enable time-series enhancements
+DETAIL:  Partition column nullable
+HINT:  Use ALTER TABLE to add a NOT NULL constraint to the partition column.
+CREATE TABLE nondate ( userid integer NOT NULL ) PARTITION BY RANGE (userid);
+SELECT enable_ts_table('nondate');
+ERROR:  could not enable time-series enhancements
+DETAIL:  Partition column was not a time type
+HINT:  Only timestamp(tz) and date partition columns are supported
+CREATE TABLE multi ( userid integer, subid integer ) PARTITION BY RANGE (userid, subid);
+SELECT enable_ts_table('multi');
+ERROR:  could not enable time-series enhancements
+DETAIL:  Partition key not single-column
+HINT:  Recreate table using a single-column partition key
+CREATE TABLE measurements (
+  metric_name text,
+  metric_value numeric,
+  metric_time timestamptz NOT NULL
+) PARTITION BY RANGE (metric_time);
+SELECT enable_ts_table('measurements', partition_duration := '0 days'::interval);
+ERROR:  unusable partition duration
+DETAIL:  Partition duration must be positive
+HINT:  Provide a positive interval for partition duration (width).
+SELECT enable_ts_table('measurements', partition_lead_time := '0 days'::interval);
+ERROR:  unusable partition lead time
+DETAIL:  Partition lead time must be positive
+HINT:  Provide a positive interval for partition creation lead time.
+SELECT enable_ts_table('measurements');
+ enable_ts_table 
+-----------------
+ 
+(1 row)
+
+SELECT partition_duration, partition_lead_time FROM ts_config ORDER BY table_id::text;
+ partition_duration | partition_lead_time 
+--------------------+---------------------
+ @ 7 days           | @ 1 mon
+(1 row)
+
+SELECT partition_interval, premake FROM part_config WHERE parent_table='public.measurements';
+ partition_interval | premake 
+--------------------+---------
+ @ 7 days           |       5
+(1 row)
+
+SELECT COUNT(*) > 10 AS has_partitions FROM ts_part_info;
+ has_partitions 
+----------------
+ t
+(1 row)
+
+SELECT set_ts_retention_policy('measurements', '90 days');
+ set_ts_retention_policy 
+-------------------------
+ 
+(1 row)
+
+SELECT retention_duration FROM ts_config WHERE table_id='measurements'::regclass;
+ retention_duration 
+--------------------
+ @ 90 days
+(1 row)
+
+SELECT retention FROM part_config WHERE parent_table='public.measurements';
+ retention 
+-----------
+ @ 90 days
+(1 row)
+
+SELECT clear_ts_retention_policy('measurements');
+ clear_ts_retention_policy 
+---------------------------
+ @ 90 days
+(1 row)
+
+SELECT retention_duration FROM ts_config WHERE table_id='measurements'::regclass;
+ retention_duration 
+--------------------
+ 
+(1 row)
+
+SELECT retention FROM part_config WHERE parent_table='public.measurements';
+ retention 
+-----------
+ 
+(1 row)
+
+SELECT set_ts_lead_time('measurements', '1 day');
+ set_ts_lead_time 
+------------------
+ @ 1 mon
+(1 row)
+
+SELECT partition_lead_time FROM ts_config WHERE table_id='measurements'::regclass;
+ partition_lead_time 
+---------------------
+ @ 1 day
+(1 row)
+
+SELECT premake FROM part_config WHERE parent_table='public.measurements';
+ premake 
+---------
+       1
+(1 row)
+
+SELECT set_ts_retention_policy('measurements', '1 days');
+ set_ts_retention_policy 
+-------------------------
+ 
+(1 row)
+
+SELECT run_maintenance();
+ run_maintenance 
+-----------------
+ 
+(1 row)
+
+SELECT COUNT(*) < 10 AS fewer_partitions FROM ts_part_info;
+ fewer_partitions 
+------------------
+ t
+(1 row)
+
