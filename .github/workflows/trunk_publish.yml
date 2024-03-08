@@ -1,0 +1,47 @@
+name: Release to Trunk
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+
+  release:
+    types:
+      - created
+jobs:
+  publish:
+    if: github.event_name == 'release'
+    name: trunk publish
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        pg-version: [14, 15, 16]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install pg-trunk
+        shell: bash
+        run: cargo install pg-trunk
+      - name: trunk build
+        working-directory: ./
+        run: ~/.cargo/bin/trunk build --pg-version ${{ matrix.pg-version }}
+      - name: trunk publish
+        working-directory: ./
+        env:
+          TRUNK_API_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
+        run: ~/.cargo/bin/trunk publish
