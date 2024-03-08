@@ -1,0 +1,13 @@
+[extension]
+name = "timeseries"
+repository = "https://github.com/tembo-io/pg_timeseries"
+license = "PostgreSQL"
+description = "Open source timeseries extension for Postgres."
+homepage = "https://github.com/tembo-io/pg_timeseries"
+documentation = "https://github.com/tembo-io/pg_timeseries"
+categories = ["timeseries"]
+version = "0.1.0"
+
+[build]
+postgres_version = "15"
+platform = "linux/amd64"
