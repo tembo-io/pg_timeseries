@@ -22,7 +22,7 @@ on:
       - created
 jobs:
   publish:
-    if: github.event_name == 'release'
+    # if: github.event_name == 'release'
     name: trunk publish
     runs-on: ubuntu-22.04
     strategy:
