@@ -38,3 +38,22 @@ To examine the table (data), index, and total size for each of your partitions, 
 On the other hand, you may be worried about plugging a firehose of data into your storage layer to begin with… While the `ts_table_info` view may allay your fears, at some point you _will_ want to remove some of your time-series data.
 
 Fortunately, it's incredibly easy to simply drop time-series partitions on a schedule. Call `set_ts_retention_policy` with your time-series table and an interval (say, `'90 days'`) to establish such a policy. Once an hour, any partitions falling entirely outside the retention window will be dropped. Use `clear_ts_retention_policy` to revert to the default behavior (infinite retention). Each of these functions will return the previous retention policy when called.
+
+## Roadmap
+
+While `timeseries` is still in its early days, we have a concrete vision for the features we will be including in the future. Feedback on the importance of a given feature to customer use cases will help us better prioritize the following lists.
+
+### Near-Term
+
+  - Columnar storage and storage type management — will enable some degree of compression and accelerate column-oriented analytics workloads
+  - Roll-off to `TABLESPACE` — as data ages, it will be moved into a specified table space
+  - Periodic `REFRESH MATERIALIZED VIEW` — set schedules for background refresh of materialized views (useful for dashboarding, etc.)
+  - Migration tools — adapters for existing time-scale installations to ease migration and promote best practices in new table configuration
+  - "Approximate" functions — maintain statistics within known error bounds without rescanning all data
+  - Change partition width — modify partition width of existing table (for future data)
+
+### Longer-Term
+
+  - "Roll-up and roll-off" — as data ages, combine multiple rows into single summary rows
+  - Incremental view maintenance — define views which stay up-to-date with incoming data without the performance hit of a `REFRESH`
+  - Repartition — modify partition width of existing table data
