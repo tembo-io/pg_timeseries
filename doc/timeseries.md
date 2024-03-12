@@ -43,17 +43,15 @@ Fortunately, it's incredibly easy to simply drop time-series partitions on a sch
 
 While `timeseries` is still in its early days, we have a concrete vision for the features we will be including in the future. Feedback on the importance of a given feature to customer use cases will help us better prioritize the following lists.
 
-### Near-Term
+This list is somewhat ordered by likelihood of near-term delivery, or maybe difficulty, but that property is only loosely intended and no guarantee of priority. Again, feedback from users will take precedence.
 
   - Columnar storage and storage type management — will enable some degree of compression and accelerate column-oriented analytics workloads
-  - Roll-off to `TABLESPACE` — as data ages, it will be moved into a specified table space
   - Periodic `REFRESH MATERIALIZED VIEW` — set schedules for background refresh of materialized views (useful for dashboarding, etc.)
+  - Roll-off to `TABLESPACE` — as data ages, it will be moved into a specified table space
+  - Automatic `CLUSTER BY`/repack for non-live partitions
   - Migration tools — adapters for existing time-scale installations to ease migration and promote best practices in new table configuration
   - "Approximate" functions — maintain statistics within known error bounds without rescanning all data
   - Change partition width — modify partition width of existing table (for future data)
-
-### Longer-Term
-
   - "Roll-up and roll-off" — as data ages, combine multiple rows into single summary rows
   - Incremental view maintenance — define views which stay up-to-date with incoming data without the performance hit of a `REFRESH`
   - Repartition — modify partition width of existing table data
