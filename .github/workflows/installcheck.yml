@@ -1,0 +1,54 @@
+name: PostgreSQL Installcheck
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, review_requested]
+
+jobs:
+  installcheck:
+    strategy:
+      matrix:
+        pg_version: [14, 15, 16]
+        os: [ubuntu-latest]
+
+    runs-on: ${{matrix.os}}
+    steps:
+      - name: Add PGDG repo
+        run: >
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' &&
+          sudo sh -c 'wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg' &&
+          sudo apt-get update
+
+      - name: Install/modify postgresql-common
+        run: >
+          sudo apt-get install -y --no-install-recommends postgresql-common &&
+          sudo sed -ri 's/#(create_main_cluster) .*$/\1 = false/' /etc/postgresql-common/createcluster.conf
+
+      - name: Install PostgreSQL and server-dev
+        run: >
+          sudo apt-get install -y --no-install-recommends \
+            postgresql-${{matrix.pg_version}} \
+            postgresql-server-dev-${{matrix.pg_version}}
+
+      - name: Install dependencies
+        run: >
+          sudo apt-get install -y --no-install-recommends \
+            postgresql-${{matrix.pg_version}}-partman
+
+      - uses: actions/checkout@v3
+
+      - name: Install extension
+        run: sudo make install
+
+      - name: Start PostgreSQL
+        run: >
+          sudo pg_dropcluster 14 main &&
+          sudo pg_createcluster ${{matrix.pg_version}} main --start -- -A trust
+
+      - name: Test extension
+        id: installcheck
+        run: PGUSER=postgres PGCLUSTER=${{matrix.pg_version}}/main make installcheck
+
+      - name: Display results
+        if: failure() && steps.installcheck.outcome != 'success'
+        run: cat regression.diffs

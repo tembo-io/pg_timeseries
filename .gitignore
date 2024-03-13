@@ -1,0 +1,5 @@
+results/
+
+# ignore latest install file
+timeseries--?.?.?.sql
+!timeseries--?.?.?--?.?.?.sql

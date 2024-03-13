@@ -5,7 +5,11 @@ EXTVERSION   = $(shell grep -m 1 '[[:space:]]\{8\}"version":' META.json | \
 DISTVERSION  = $(shell grep -m 1 '[[:space:]]\{3\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
+EXTVERSIONS = 0.1.0 0.1.1
+
 DATA 		 = $(wildcard sql/*--*.sql)
+DATA_built = $(foreach v,$(EXTVERSIONS),sql/$(EXTENSION)--$(v).sql)
+
 DOCS         = $(wildcard doc/*.md)
 TESTS        = $(wildcard test/sql/*.sql)
 REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
@@ -18,11 +22,15 @@ include $(PGXS)
 
 all: sql/$(EXTENSION)--$(EXTVERSION).sql
 
-sql/$(EXTENSION)--$(EXTVERSION).sql: sql/$(EXTENSION).sql
-	cp $< $@
-
 dist:
 	git archive --format zip --prefix=$(EXTENSION)-$(DISTVERSION)/ -o $(EXTENSION)-$(DISTVERSION).zip HEAD
 
 latest-changes.md: Changes
 	perl -e 'while (<>) {last if /^(v?\Q${DISTVERSION}\E)/; } print "Changes for v${DISTVERSION}:\n"; while (<>) { last if /^\s*$$/; s/^\s+//; print }' Changes > $@
+
+# generate each version's file installation file by concatenating
+# previous upgrade scripts
+sql/$(EXTENSION)--0.1.0.sql: sql/$(EXTENSION).sql
+	cat $^ > $@
+sql/$(EXTENSION)--0.1.1.sql: sql/$(EXTENSION)--0.1.0.sql sql/$(EXTENSION)--0.1.0--0.1.1.sql
+	cat $^ > $@
