@@ -10,12 +10,12 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'README.md'
+      - "README.md"
   push:
     branches:
       - main
     paths-ignore:
-      - 'README.md'
+      - "README.md"
 
   release:
     types:
