@@ -4,19 +4,45 @@
   "description": "Convenience API for Tembo time series stack",
   "version": "0.1.1",
   "maintainer": [
-     "Jason Petersen <jason@tembo.io>"
+    "Jason Petersen <jason@tembo.io>"
   ],
   "license": "mit",
   "provides": {
-     "timeseries": {
-        "abstract": "Convenience API for Tembo time series stack",
-        "file": "sql/timeseries.sql",
-        "docfile": "doc/timeseries.md",
-        "version": "0.1.1"
-     }
+    "timeseries": {
+      "abstract": "Convenience API for Tembo time series stack",
+      "file": "sql/timeseries.sql",
+      "docfile": "doc/timeseries.md",
+      "version": "0.1.1"
+    }
   },
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "PostgreSQL": "14.0.0"
+      },
+      "recommends": {
+        "pg_partman": "4.5.1"
+      }
+    }
+  },
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/tembo-io/pg_timeseries/issues/"
+    },
+    "repository": {
+      "url": "git://github.com/tembo-io/pg_timeseries.git",
+      "web": "https://github.com/tembo-io/pg_timeseries/",
+      "type": "git"
+    }
+  },
+  "generated_by": "Jason Petersen",
   "meta-spec": {
-     "version": "1.0.0",
-     "url": "https://pgxn.org/meta/spec.txt"
-  }
+    "version": "1.0.0",
+    "url": "https://pgxn.org/meta/spec.txt"
+  },
+  "tags": [
+    "time series",
+    "partition",
+    "retention"
+  ]
 }

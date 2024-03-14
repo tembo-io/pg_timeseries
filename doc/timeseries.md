@@ -12,7 +12,7 @@ SELECT enable_ts_table('sensor_readings');
 
 With this one call, several things will happen:
 
-  * The table will be restructred as a series of partitions using PostgreSQL's [native PARTITION features](https://www.postgresql.org/docs/current/ddl-partitioning.html)
+  * The table will be restructured as a series of partitions using PostgreSQL's [native PARTITION features](https://www.postgresql.org/docs/current/ddl-partitioning.html)
   * Each partition covers a particular range of time (one week by default)
   * New partitions will be created for some time in the future (one month by default)
   * Once an hour, a maintenance job will create any missing partitions as well as needed future ones
