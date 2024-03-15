@@ -134,7 +134,7 @@ BEGIN
                date_part('EPOCH', partition_duration))
     INTO leading_partitions;
 
-  SELECT @extschema:pg_partman@.create_parent(
+  SELECT create_parent(
       p_parent_table := table_name,
       p_control := pkey_name::text,
       p_interval := partition_duration::text,
@@ -192,7 +192,7 @@ BEGIN
     LEFT JOIN pg_namespace n
       ON n.oid = c.relnamespace
     WHERE c.oid=target_table_id;
-  UPDATE @extschema:pg_partman@.part_config
+  UPDATE part_config
     SET retention=new_retention
     WHERE parent_table=table_name;
 
@@ -264,7 +264,7 @@ BEGIN
                date_part('EPOCH', part_duration))
     INTO leading_partitions;
 
-  UPDATE @extschema:pg_partman@.part_config
+  UPDATE part_config
     SET premake=leading_partitions
     WHERE parent_table=table_name;
 

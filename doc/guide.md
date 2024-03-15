@@ -4,13 +4,17 @@ In this guide, you will become familiar with the functions and features of the t
 
 ## Preparing your database
 
-You'll need a PostgreSQL instance running timeseries `0.1.2` or later. An easy way to have one set up for you is to deploy one from Tembo Cloud [here](https://cloud.tembo.io). The free tier _should_ perform well enough, though slightly more memory may be a good idea.
+You'll need a PostgreSQL instance running timeseries `0.1.2` or later. An easy way to have one set up for you is to deploy one from Tembo Cloud [here](https://cloud.tembo.io). The free tier will perform well enough for the data set we'll be using.
 
-Once that's up and running, you'll need a client machine with `psql` (to connect to your database) and [the Divvy dataset](TODO), which will total about 4GiB of CSV after decompression. If you need help installing `psql`, instructions can be found [here](TODO).
+Once that's up and running, you'll need a client machine with `psql` (to connect to your database) and [the Divvy dataset](TODO), which will total about 4GiB of CSV after decompression.
 
-### Connecting to Tembo
+### Getting `psql`
 
-TODO
+If you need help installing `psql`, finding instructions for you platform should be relatively straightforward:
+
+  * Mac — Homebrew's `libpq` package includes `psql`
+  * Ubuntu/Debian — the `postgresql-client` apt package provides `psql`
+  * Windows — [EDB's installers](https://www.postgresql.org/download/windows/) can help
 
 ### Create the time-series table
 
@@ -29,8 +33,8 @@ CREATE TABLE IF NOT EXISTS
   divvy_trips (
     ride_id text NOT NULL,
     rideable_type text NULL,
-    started_at timestamptz NOT NULL,
-    ended_at timestamptz NOT NULL,
+    started_at timestamp NOT NULL,
+    ended_at timestamp NOT NULL,
     start_station_name text,
     start_station_id text,
     end_station_name text,
@@ -70,7 +74,7 @@ This tutorial will not reflect real-world use (where our analytic queries must l
 
 ### Add appropriate indexes
 
-The `timeseries` extension will create an index on the table's partition column if [none exists](TODO), but for our tutorial we'll want a few more.
+For the queries you'll perform during this tutorial, the following indexes are recommended.
 
 ```sql
 CREATE INDEX ON divvy_trips (started_at DESC);
@@ -155,9 +159,6 @@ We'll return to these after loading our data.
 
 ## Load and inspect data
 
-NOTE: sub-one minute load time for data (on free tier)
-NOTE: sub-five minute run time for guide
-
 The CSV should load with a simple `\copy` command.
 
 ```sql
@@ -192,7 +193,7 @@ user@[local] postgres ❯❯❯ SELECT
 All right, we're looking at about six gigs, split somewhat evenly between indexes and data. But are the partitions similar sizes?
 
 ```sql
-jason@[local] postgres ❯❯❯ SELECT
+user@[local] postgres ❯❯❯ SELECT
   part_range,
   pg_size_pretty(total_size_bytes) AS part_size
   FROM ts_part_info
@@ -429,3 +430,41 @@ WITH rides AS (
 
 The 100th percentile is likely bad data, but the rest is interesting! Most rides are under ten minutes, but one in ten exceeds a half-hour. Putting this in to a `MATERIALIZED VIEW` and refreshing it weekly might make a nice source for an office dashboard or other visualization.
 
+## Configuring retention
+
+Up until now we've been exploring older data, but in a timeseries system it's usually the case that new data is always being appended to a main table and older data either rolls off to long-term storage or is dropped entirely.
+
+Rolling off onto other storage methods is a feature on the roadmap for `timeseries`, but is not yet available; however, if simply dropping the data satisfies your use case, a retention policy can be easily configued with a single call:
+
+```sql
+SELECT set_ts_retention_policy('divvy_trips', '2 years');
+┌─────────────────────────┐
+│ set_ts_retention_policy │
+├─────────────────────────┤
+│ ∅                       │
+└─────────────────────────┘
+```
+
+This function returns the retention policy for the specified table and returns the value of the old policy (here `NULL`, since by default none was set when we initially set up this table). Data is not dropped immediately, but every time the maintenance function runs (once an hour), any partitions entirely older than the cutoff will be dropped.
+
+We can force a maintenance cycle and verify partitions were dropped like so:
+
+```sql
+user@[local] postgres ❯❯❯ SELECT run_maintenance();
+┌─────────────────┐
+│ run_maintenance │
+├─────────────────┤
+│                 │
+└─────────────────┘
+
+user@[local] postgres ❯❯❯ SELECT COUNT(*) = 0 AS data_gone
+FROM divvy_trips
+WHERE started_at < (now() - INTERVAL '25 months');
+┌───────────┐
+│ data_gone │
+├───────────┤
+│ t         │
+└───────────┘
+```
+
+_Note: the above query uses `25 months` rather than `2 years` because it is likely that the moment exactly two years ago occurs somewhere in the middle of a partition, meaning that partition should not be dropped yet. The partition containing the point 25 months ago will definitely be dropped._
