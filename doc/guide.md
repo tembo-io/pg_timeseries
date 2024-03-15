@@ -6,7 +6,9 @@ In this guide, you will become familiar with the functions and features of the t
 
 You'll need a PostgreSQL instance running timeseries `0.1.2` or later. An easy way to have one set up for you is to deploy one from Tembo Cloud [here](https://cloud.tembo.io). The free tier will perform well enough for the data set we'll be using.
 
-Once that's up and running, you'll need a client machine with `psql` (to connect to your database) and [the Divvy dataset](TODO), which will total about 4GiB of CSV after decompression.
+Once that's up and running, you'll need a client machine with `psql` (to connect to your database) and [the Divvy dataset](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-slim.csv.gz), which will total about 500MiB of CSV after decompression.
+
+_Note: If you'd like a larger data set, the above set is a downsampled version of [this file](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-slim.csv.gz), which covers the same time range but has seven times as many trips. This guide was written using the larger set._
 
 ### Getting `psql`
 
@@ -94,7 +96,9 @@ Because viewing the sizes of the data and indexes of a partitioned table can be 
 This table stores information about how time-series tables were created and is queried or modified by `timeseries`' code any time its functions are called. Here's how it should look for us:
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT * FROM ts_config;
+SELECT * FROM ts_config;
+```
+```
 ┌─[ RECORD 1 ]────────┬─────────────┐
 │ table_id            │ divvy_trips │
 │ partition_duration  │ 1 mon       │
@@ -110,7 +114,9 @@ user@[local] postgres ❯❯❯ SELECT * FROM ts_config;
 If you need a "big picture" of the data and index usage for your time-series table, check this view: it contains columns that sum across all partitions. Throw this value into a monitoring system to keep on top of your total disk usage for each time-series table.
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT * FROM ts_table_info;
+SELECT * FROM ts_table_info;
+```
+```
 ┌─[ RECORD 1 ]─────┬─────────────┐
 │ table_id         │ divvy_trips │
 │ table_size_bytes │ 434176      │
@@ -126,7 +132,9 @@ _Hint: these views keep the sizes as numeric types, which makes arithmetic and a
 When picking `partition_duration`, it is crucial to double-check your work using this view. It's essentially identical to the table-based view (in fact, it feeds it), but shows data on a per-partition basis.
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT * FROM ts_part_info ;
+SELECT * FROM ts_part_info;
+```
+```
 ┌─[ RECORD 1 ]─────┬────────────────────────────────────────────┐
 │ table_id         │ divvy_trips                                │
 │ part_id          │ divvy_trips_p20200101                      │
@@ -162,9 +170,11 @@ We'll return to these after loading our data.
 The CSV should load with a simple `\copy` command.
 
 ```sql
-user@[local] postgres ❯❯❯ \copy divvy_trips
-  from 202004--202402-divvy-tripdata.csv
+\copy divvy_trips
+  from 202004--202402-divvy-tripdata-slim.csv
   with (header on, format csv);
+```
+```
 COPY 20465490
 ```
 
@@ -177,12 +187,14 @@ There are important considerations in the bulk-loading of data which can improve
 Let's check the table size now:
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT
+SELECT
   table_id,
   pg_size_pretty(table_size_bytes) AS table_size,
   pg_size_pretty(index_size_bytes) AS index_size,
   pg_size_pretty(total_size_bytes) AS total_size
   FROM ts_table_info;
+```
+```
 ┌─────────────┬────────────┬────────────┬────────────┐
 │  table_id   │ table_size │ index_size │ total_size │
 ├─────────────┼────────────┼────────────┼────────────┤
@@ -193,12 +205,14 @@ user@[local] postgres ❯❯❯ SELECT
 All right, we're looking at about six gigs, split somewhat evenly between indexes and data. But are the partitions similar sizes?
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT
+SELECT
   part_range,
   pg_size_pretty(total_size_bytes) AS part_size
   FROM ts_part_info
   ORDER BY total_size_bytes DESC
   LIMIT 5;
+```
+```
 ┌───────────────────────────────────────────────────────────────┬───────────┐
 │                                part_range                     │ part_size │
 ├───────────────────────────────────────────────────────────────┼───────────┤
@@ -220,6 +234,8 @@ SELECT
   WHERE total_size_bytes > pg_size_bytes('1MB')
   ORDER BY total_size_bytes ASC
   LIMIT 5;
+```
+```
 ┌───────────────────────────────────────────────────────────────┬───────────┐
 │                                part_range                     │ part_size │
 ├───────────────────────────────────────────────────────────────┼───────────┤
@@ -238,10 +254,12 @@ These are fully ten times smaller than the largest, in several cases. While not 
 Before we begin writing more complex theories, let's see what the planner comes up with for a count of queries during a certain quarter…
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT COUNT(*)
+SELECT COUNT(*)
   FROM divvy_trips
   WHERE started_at > '2022-01-01'
   AND started_at < '2022-04-01';
+```
+```
 ┌────────┐
 │ count  │
 ├────────┤
@@ -252,10 +270,12 @@ user@[local] postgres ❯❯❯ SELECT COUNT(*)
 This took less than 40ms on my install. How does that work?
 
 ```sql
-user@[local] postgres ❯❯❯ EXPLAIN SELECT COUNT(*)
+EXPLAIN SELECT COUNT(*)
   FROM divvy_trips
   WHERE started_at > '2022-01-01'
   AND started_at < '2022-04-01';
+```
+```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                               QUERY PLAN                                                │
 ├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -290,12 +310,14 @@ That's what we expect, but it's good to see.
 With our data loaded up, we're ready for some more interesting queries. Start by figuring out which days of the week had the most rides in 2023. The `dow` option to `extract` starts the week at `0` on Sunday.
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT
+SELECT
   extract(dow from started_at) AS weekday_idx,
   COUNT(*) AS total_rides FROM divvy_trips
   WHERE started_at BETWEEN '2023-01-01' AND '2024-01-01'
   GROUP BY weekday_idx
   ORDER BY weekday_idx;
+```
+```
 ┌─────────────┬─────────────┐
 │ weekday_idx │ total_rides │
 ├─────────────┼─────────────┤
@@ -312,7 +334,7 @@ user@[local] postgres ❯❯❯ SELECT
 It's pretty clear ridership falls on Sundays and Mondays but really picks up going into the weekends. What about hourly trends? Which stations have the highest ridership during the mornings? Because of more modern stationless bikes, not all rides have an originating station, so we need to include a filter for that.
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT
+SELECT
   start_station_id,
   COUNT(*) as checkouts
   FROM divvy_trips
@@ -320,6 +342,8 @@ user@[local] postgres ❯❯❯ SELECT
   AND started_at BETWEEN '2023-01-01' AND '2024-01-01'
   AND date_part('hour', started_at) BETWEEN 6 AND 10
   GROUP BY start_station_id ORDER BY checkouts DESC limit 10;
+```
+```
 ┌──────────────────┬───────────┐
 │ start_station_id │ checkouts │
 ├──────────────────┼───────────┤
@@ -339,7 +363,7 @@ user@[local] postgres ❯❯❯ SELECT
 This could be useful information when deciding where to redeploy bikes from maintenance holds overnight going into the morning rush. Let's compare this to the most popular endpoints during evening hours…
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT
+SELECT
   end_station_id,
   COUNT(*) as checkins
   FROM divvy_trips
@@ -347,6 +371,8 @@ user@[local] postgres ❯❯❯ SELECT
   AND started_at BETWEEN '2023-01-01' AND '2024-01-01'
   AND date_part('hour', started_at) BETWEEN 17 AND 21
   GROUP BY end_station_id ORDER BY checkins DESC limit 10;
+```
+```
 ┌────────────────┬──────────┐
 │ end_station_id │ checkins │
 ├────────────────┼──────────┤
@@ -368,7 +394,7 @@ While this list shares _some_ elements with the morning hot spots, there are sev
 What about the adoption and use of the different kinds of bicycles? This query is hand-written to perform a pivot for the sake of output readability:
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT
+SELECT
   date_trunc('month', started_at)::date AS month,
   SUM(CASE WHEN rideable_type = 'classic_bike' THEN 1 ELSE 0 END) AS classic,
   SUM(CASE WHEN rideable_type = 'docked_bike' THEN 1 ELSE 0 END) AS docked,
@@ -377,6 +403,8 @@ user@[local] postgres ❯❯❯ SELECT
   WHERE started_at BETWEEN '2022-01-01' AND '2023-01-01'
   GROUP BY month
   ORDER BY month ASC;
+```
+```
 ┌────────────┬─────────┬────────┬──────────┐
 │   month    │ classic │ docked │ electric │
 ├────────────┼─────────┼────────┼──────────┤
@@ -398,7 +426,6 @@ user@[local] postgres ❯❯❯ SELECT
 We probably want some insight into the duration of rides. Let's generate a table of deciles…
 
 ```sql
-user@[local] postgres ❯❯❯
 WITH rides AS (
   SELECT (ended_at - started_at) AS duration
   FROM divvy_trips
@@ -412,6 +439,8 @@ WITH rides AS (
   FROM deciles
   GROUP BY decile
   ORDER BY decile ASC;
+```
+```
 ┌──────┬──────────────────┐
 │ %ile │     duration     │
 ├──────┼──────────────────┤
@@ -438,6 +467,8 @@ Rolling off onto other storage methods is a feature on the roadmap for `timeseri
 
 ```sql
 SELECT set_ts_retention_policy('divvy_trips', '2 years');
+```
+```
 ┌─────────────────────────┐
 │ set_ts_retention_policy │
 ├─────────────────────────┤
@@ -450,16 +481,21 @@ This function returns the retention policy for the specified table and returns t
 We can force a maintenance cycle and verify partitions were dropped like so:
 
 ```sql
-user@[local] postgres ❯❯❯ SELECT run_maintenance();
+SELECT run_maintenance();
+```
+```
 ┌─────────────────┐
 │ run_maintenance │
 ├─────────────────┤
 │                 │
 └─────────────────┘
-
-user@[local] postgres ❯❯❯ SELECT COUNT(*) = 0 AS data_gone
+```
+```sql
+SELECT COUNT(*) = 0 AS data_gone
 FROM divvy_trips
 WHERE started_at < (now() - INTERVAL '25 months');
+```
+```
 ┌───────────┐
 │ data_gone │
 ├───────────┤
