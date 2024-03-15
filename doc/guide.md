@@ -8,7 +8,7 @@ You'll need a PostgreSQL instance running timeseries `0.1.2` or later. An easy w
 
 Once that's up and running, you'll need a client machine with `psql` (to connect to your database) and [the Divvy dataset](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-slim.csv.gz), which will total about 500MiB of CSV after decompression.
 
-_Note: If you'd like a larger data set, the above set is a downsampled version of [this file](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-slim.csv.gz), which covers the same time range but has seven times as many trips. This guide was written using the larger set._
+_Note: If you'd like a larger data set, the above set is a downsampled version of [this file](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-full.csv.gz), which covers the same time range but has seven times as many trips. This guide was written using the larger set._
 
 ### Getting `psql`
 
