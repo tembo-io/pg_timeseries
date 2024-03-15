@@ -21,7 +21,8 @@ CREATE TABLE @extschema@.ts_config(
 CREATE OR REPLACE FUNCTION @extschema@.enable_ts_table(
   target_table_id regclass,
   partition_duration interval DEFAULT '7 days'::interval,
-  partition_lead_time interval DEFAULT '1 mon'::interval)
+  partition_lead_time interval DEFAULT '1 mon'::interval,
+  initial_table_start timestamptz DEFAULT NULL)
  RETURNS void
  LANGUAGE plpgsql
 AS $function$
@@ -133,11 +134,12 @@ BEGIN
                date_part('EPOCH', partition_duration))
     INTO leading_partitions;
 
-  SELECT @extschema:pg_partman@.create_parent(
+  SELECT create_parent(
       p_parent_table := table_name,
       p_control := pkey_name::text,
       p_interval := partition_duration::text,
-      p_premake := leading_partitions::integer)
+      p_premake := leading_partitions::integer,
+      p_start_partition := initial_table_start::text)
     INTO partman_success;
 
   IF NOT partman_success THEN
@@ -190,7 +192,7 @@ BEGIN
     LEFT JOIN pg_namespace n
       ON n.oid = c.relnamespace
     WHERE c.oid=target_table_id;
-  UPDATE @extschema:pg_partman@.part_config
+  UPDATE part_config
     SET retention=new_retention
     WHERE parent_table=table_name;
 
@@ -262,7 +264,7 @@ BEGIN
                date_part('EPOCH', part_duration))
     INTO leading_partitions;
 
-  UPDATE @extschema:pg_partman@.part_config
+  UPDATE part_config
     SET premake=leading_partitions
     WHERE parent_table=table_name;
 

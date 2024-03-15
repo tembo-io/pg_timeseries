@@ -2,7 +2,7 @@
   "name": "timeseries",
   "abstract": "Convenience API for Tembo time series stack",
   "description": "Convenience API for Tembo time series stack",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "maintainer": [
     "Jason Petersen <jason@tembo.io>"
   ],
@@ -12,7 +12,7 @@
       "abstract": "Convenience API for Tembo time series stack",
       "file": "sql/timeseries.sql",
       "docfile": "doc/timeseries.md",
-      "version": "0.1.1"
+      "version": "0.1.2"
     }
   },
   "prereqs": {
