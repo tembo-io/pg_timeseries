@@ -181,7 +181,7 @@ The CSV should load with a simple `\copy` command.
   with (header on, format csv);
 ```
 ```
-COPY 20465490
+COPY 2923641
 ```
 
 ### Bulk load considerations
