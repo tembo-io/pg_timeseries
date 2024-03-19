@@ -167,11 +167,17 @@ We'll return to these after loading our data.
 
 ## Load and inspect data
 
+Decompress the data file if you have not already done so.
+
+```shell
+gzip -d 202004--202402-divvy-tripdata-slim.csv.gz
+```
+
 The CSV should load with a simple `\copy` command.
 
 ```sql
 \copy divvy_trips
-  from 202004--202402-divvy-tripdata-slim.csv
+  from '202004--202402-divvy-tripdata-slim.csv'
   with (header on, format csv);
 ```
 ```
