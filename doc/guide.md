@@ -176,9 +176,7 @@ gzip -d 202004--202402-divvy-tripdata-slim.csv.gz
 The CSV should load with a simple `\copy` command.
 
 ```sql
-\copy divvy_trips
-  from '202004--202402-divvy-tripdata-slim.csv'
-  with (header on, format csv);
+\copy divvy_trips from '202004--202402-divvy-tripdata-slim.csv' with (header on, format csv);
 ```
 ```
 COPY 20465490
