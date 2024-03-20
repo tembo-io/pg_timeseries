@@ -6,9 +6,9 @@ In this guide, you will become familiar with the functions and features of the t
 
 You'll need a PostgreSQL instance running timeseries `0.1.2` or later. An easy way to have one set up for you is to deploy one from Tembo Cloud [here](https://cloud.tembo.io). The free tier will perform well enough for the data set we'll be using.
 
-Once that's up and running, you'll need a client machine with `psql` (to connect to your database) and [the Divvy dataset](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-slim.csv.gz), which will total about 500MiB of CSV after decompression.
+Once that's up and running, you'll need a client machine with `psql` (to connect to your database) and [the Divvy dataset](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-slim.csv.gz), which will total about 50MiB of CSV after decompression.
 
-_Note: If you'd like a larger data set, the above set is a downsampled version of [this file](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-full.csv.gz), which covers the same time range but has seven times as many trips. This guide was written using the larger set._
+_Note: If you'd like a larger data set, the above set is a downsampled version of [this file](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-full.csv.gz), which covers the same time range but has 75 times as many trips._
 
 ### Getting `psql`
 
@@ -167,7 +167,7 @@ We'll return to these after loading our data.
 
 ## Load and inspect data
 
-Decompress the data file if you have not already done so.
+Decompress the data file if you have not already done so:
 
 ```shell
 gzip -d 202004--202402-divvy-tripdata-slim.csv.gz
@@ -179,7 +179,7 @@ The CSV should load with a simple `\copy` command.
 \copy divvy_trips from '202004--202402-divvy-tripdata-slim.csv' with (header on, format csv);
 ```
 ```
-COPY 20465490
+COPY 272873
 ```
 
 ### Bulk load considerations
@@ -202,11 +202,11 @@ SELECT
 ┌─────────────┬────────────┬────────────┬────────────┐
 │  table_id   │ table_size │ index_size │ total_size │
 ├─────────────┼────────────┼────────────┼────────────┤
-│ divvy_trips │ 3549 MB    │ 3301 MB    │ 6849 MB    │
+│ divvy_trips │ 59 MB      │ 49 MB      │ 108 MB     │
 └─────────────┴────────────┴────────────┴────────────┘
 ```
 
-All right, we're looking at about six gigs, split somewhat evenly between indexes and data. But are the partitions similar sizes?
+All right, we're looking at about 100 megs, split somewhat evenly between indexes and data. But are the partitions similar sizes?
 
 ```sql
 SELECT
@@ -217,41 +217,41 @@ SELECT
   LIMIT 5;
 ```
 ```
-┌───────────────────────────────────────────────────────────────┬───────────┐
-│                                part_range                     │ part_size │
-├───────────────────────────────────────────────────────────────┼───────────┤
-│ FROM ('2021-07-01 00:00:00-06') TO ('2021-08-01 00:00:00-06') │ 277 MB    │
-│ FROM ('2022-07-01 00:00:00-06') TO ('2022-08-01 00:00:00-06') │ 277 MB    │
-│ FROM ('2021-08-01 00:00:00-06') TO ('2021-09-01 00:00:00-06') │ 271 MB    │
-│ FROM ('2022-08-01 00:00:00-06') TO ('2022-09-01 00:00:00-06') │ 263 MB    │
-│ FROM ('2022-06-01 00:00:00-06') TO ('2022-07-01 00:00:00-06') │ 258 MB    │
-└───────────────────────────────────────────────────────────────┴───────────┘
+┌─────────────────────────────────────────────────────────┬───────────┐
+│                             part_range                  │ part_size │
+├─────────────────────────────────────────────────────────┼───────────┤
+│ FROM ('2021-07-01 00:00:00') TO ('2021-08-01 00:00:00') │ 4056 kB   │
+│ FROM ('2021-08-01 00:00:00') TO ('2021-09-01 00:00:00') │ 3904 kB   │
+│ FROM ('2022-07-01 00:00:00') TO ('2022-08-01 00:00:00') │ 3896 kB   │
+│ FROM ('2021-09-01 00:00:00') TO ('2021-10-01 00:00:00') │ 3808 kB   │
+│ FROM ('2022-08-01 00:00:00') TO ('2022-09-01 00:00:00') │ 3768 kB   │
+└─────────────────────────────────────────────────────────┴───────────┘
 ```
 
-The largest appear to be roughly 100MB and covering time ranges in the summer, a nice manageable size (especially once parallel queries start hitting many at once). But the smallest? Note the `WHERE` clause needed to filter out entirely empty partitions (which are related to the size of empty tables and indexes).
+The largest appear to be roughly 4MiB and covering time ranges in the summer. But the smallest? Note the `WHERE` clause needed to filter out entirely empty partitions (which are related to the size of empty tables and indexes).
 
 ```sql
 SELECT
   part_range,
   pg_size_pretty(total_size_bytes) AS part_size
   FROM ts_part_info
-  WHERE total_size_bytes > pg_size_bytes('1MB')
+  WHERE total_size_bytes > pg_size_bytes('100kB')
   ORDER BY total_size_bytes ASC
   LIMIT 5;
 ```
 ```
-┌───────────────────────────────────────────────────────────────┬───────────┐
-│                                part_range                     │ part_size │
-├───────────────────────────────────────────────────────────────┼───────────┤
-│ FROM ('2021-02-01 00:00:00-07') TO ('2021-03-01 00:00:00-07') │ 18 MB     │
-│ FROM ('2020-04-01 00:00:00-06') TO ('2020-05-01 00:00:00-06') │ 28 MB     │
-│ FROM ('2021-01-01 00:00:00-07') TO ('2021-02-01 00:00:00-07') │ 34 MB     │
-│ FROM ('2022-01-01 00:00:00-07') TO ('2022-02-01 00:00:00-07') │ 36 MB     │
-│ FROM ('2022-02-01 00:00:00-07') TO ('2022-03-01 00:00:00-07') │ 39 MB     │
-└───────────────────────────────────────────────────────────────┴───────────┘
+┌─────────────────────────────────────────────────────────┬───────────┐
+│                             part_range                  │ part_size │
+├─────────────────────────────────────────────────────────┼───────────┤
+│ FROM ('2021-02-01 00:00:00') TO ('2021-03-01 00:00:00') │ 384 kB    │
+│ FROM ('2020-04-01 00:00:00') TO ('2020-05-01 00:00:00') │ 488 kB    │
+│ FROM ('2021-01-01 00:00:00') TO ('2021-02-01 00:00:00') │ 592 kB    │
+│ FROM ('2022-01-01 00:00:00') TO ('2022-02-01 00:00:00') │ 632 kB    │
+│ FROM ('2022-02-01 00:00:00') TO ('2022-03-01 00:00:00') │ 664 kB    │
+└─────────────────────────────────────────────────────────┴───────────┘
 ```
 
-These are fully ten times smaller than the largest, in several cases. While not exactly surprising that a bike share in Chicago sees less utilization in January and February (and during, uhhhh, the onset of the COVID-19 lockdown), it's neat to see the seasonality of this data in the partition sizes themselves.
+These are fully ten times smaller than the largest, in several cases. While not exactly surprising that a bike share in Chicago sees less utilization in January and February (and during the onset of the COVID-19 lockdown), it's neat to see the seasonality of this data in the partition sizes themselves.
 
 ### `EXPLAIN` partition pruning
 
@@ -264,11 +264,11 @@ SELECT COUNT(*)
   AND started_at < '2022-04-01';
 ```
 ```
-┌────────┐
-│ count  │
-├────────┤
-│ 503421 │
-└────────┘
+┌───────┐
+│ count │
+├───────┤
+│ 6712  │
+└───────┘
 ```
 
 This took less than 40ms on my install. How does that work?
@@ -280,32 +280,27 @@ EXPLAIN SELECT COUNT(*)
   AND started_at < '2022-04-01';
 ```
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                               QUERY PLAN                                                │
-├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ Finalize Aggregate  (cost=16941.10..16941.11 rows=1 width=8)                                            │
-│   ->  Gather  (cost=16940.89..16941.10 rows=2 width=8)                                                  │
-│         Workers Planned: 2                                                                              │
-│         ->  Partial Aggregate  (cost=15940.89..15940.90 rows=1 width=8)                                 │
-│               ->  Parallel Append  (cost=0.29..15416.49 rows=209759 width=0)                            │
-│                     ->  Parallel Index Only Scan using divvy_trips_p20220201_started_at_idx on divvy_tr…│
-│…ips_p20220201 divvy_trips_2  (cost=0.29..3298.08 rows=48170 width=0)                                    │
-│                           Index Cond: ((started_at > '2022-01-01 00:00:00-07'::timestamp with time zone…│
-│…) AND (started_at < '2022-04-01 00:00:00-06'::timestamp with time zone))                                │
-│                     ->  Parallel Index Only Scan using divvy_trips_p20220101_started_at_idx on divvy_tr…│
-│…ips_p20220101 divvy_trips_1  (cost=0.29..3006.35 rows=43238 width=0)                                    │
-│                           Index Cond: ((started_at > '2022-01-01 00:00:00-07'::timestamp with time zone…│
-│…) AND (started_at < '2022-04-01 00:00:00-06'::timestamp with time zone))                                │
-│                     ->  Parallel Seq Scan on divvy_trips_p20220301 divvy_trips_3  (cost=0.00..8063.26 r…│
-│…ows=118351 width=0)                                                                                     │
-│                           Filter: ((started_at > '2022-01-01 00:00:00-07'::timestamp with time zone) AN…│
-│…D (started_at < '2022-04-01 00:00:00-06'::timestamp with time zone))                                    │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       QUERY PLAN                                       │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ Aggregate  (cost=301.02..301.03 rows=1 width=8)                                        │
+│   ->  Append  (cost=0.00..284.24 rows=6712 width=0)                                    │
+│         ->  Seq Scan on divvy_trips_p20220101 divvy_trips_1  (cost=0.00..52.76 rows=13…│
+│…84 width=0)                                                                            │
+│               Filter: ((started_at > '2022-01-01 00:00:00'::timestamp without time zon…│
+│…e) AND (started_at < '2022-04-01 00:00:00'::timestamp without time zone))              │
+│         ->  Seq Scan on divvy_trips_p20220201 divvy_trips_2  (cost=0.00..57.11 rows=15…│
+│…41 width=0)                                                                            │
+│               Filter: ((started_at > '2022-01-01 00:00:00'::timestamp without time zon…│
+│…e) AND (started_at < '2022-04-01 00:00:00'::timestamp without time zone))              │
+│         ->  Seq Scan on divvy_trips_p20220301 divvy_trips_3  (cost=0.00..140.81 rows=3…│
+│…787 width=0)                                                                           │
+│               Filter: ((started_at > '2022-01-01 00:00:00'::timestamp without time zon…│
+│…e) AND (started_at < '2022-04-01 00:00:00'::timestamp without time zone))              │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-There's a lot going on here, but the important things to note are:
-  * the `COUNT` aggregate has been broken into an append and gather job using two workers
-  * only three partitions are referenced by this plan
+There's a lot going on here, but the important thing to note is that only three partitions are referenced by this plan.
 
 That's what we expect, but it's good to see.
 
@@ -325,13 +320,13 @@ SELECT
 ┌─────────────┬─────────────┐
 │ weekday_idx │ total_rides │
 ├─────────────┼─────────────┤
-│           0 │      744578 │
-│           1 │      729404 │
-│           2 │      822978 │
-│           3 │      835625 │
-│           4 │      860202 │
-│           5 │      843524 │
-│           6 │      883566 │
+│           0 │        9890 │
+│           1 │        9820 │
+│           2 │       11166 │
+│           3 │       11099 │
+│           4 │       11327 │
+│           5 │       11283 │
+│           6 │       11680 │
 └─────────────┴─────────────┘
 ```
 
@@ -351,16 +346,16 @@ SELECT
 ┌──────────────────┬───────────┐
 │ start_station_id │ checkouts │
 ├──────────────────┼───────────┤
-│ WL-012           │     11768 │
-│ KA1503000043     │      9800 │
-│ TA1305000032     │      9495 │
-│ TA1307000039     │      9410 │
-│ 638              │      7202 │
-│ KA1504000135     │      7032 │
-│ 13011            │      6888 │
-│ SL-005           │      6855 │
-│ 13022            │      6750 │
-│ TA1306000012     │      6427 │
+│ TA1307000039     │       150 │
+│ WL-012           │       143 │
+│ KA1503000043     │       121 │
+│ TA1305000032     │       115 │
+│ 638              │       112 │
+│ 13011            │       111 │
+│ TA1306000003     │        92 │
+│ SL-005           │        90 │
+│ 13146            │        90 │
+│ 13137            │        88 │
 └──────────────────┴───────────┘
 ```
 
@@ -380,16 +375,16 @@ SELECT
 ┌────────────────┬──────────┐
 │ end_station_id │ checkins │
 ├────────────────┼──────────┤
-│ 13022          │    17120 │
-│ LF-005         │    15629 │
-│ TA1307000039   │    12918 │
-│ TA1308000050   │    12239 │
-│ KA1504000135   │    11565 │
-│ 13137          │    11284 │
-│ 13300          │     9982 │
-│ 13146          │     9919 │
-│ 13042          │     9815 │
-│ TA1307000134   │     9753 │
+│ LF-005         │      213 │
+│ 13022          │      213 │
+│ TA1308000050   │      176 │
+│ KA1504000135   │      166 │
+│ 13137          │      162 │
+│ TA1307000039   │      153 │
+│ 13300          │      134 │
+│ 13146          │      132 │
+│ 13179          │      131 │
+│ TA1307000134   │      131 │
 └────────────────┴──────────┘
 ```
 
@@ -412,18 +407,18 @@ SELECT
 ┌────────────┬─────────┬────────┬──────────┐
 │   month    │ classic │ docked │ electric │
 ├────────────┼─────────┼────────┼──────────┤
-│ 2022-01-01 │   55067 │    961 │    47742 │
-│ 2022-02-01 │   59414 │   1361 │    54834 │
-│ 2022-03-01 │  134439 │   8358 │   141245 │
-│ 2022-04-01 │  166712 │  12116 │   192421 │
-│ 2022-05-01 │  324046 │  26409 │   284403 │
-│ 2022-06-01 │  406660 │  30640 │   331904 │
-│ 2022-07-01 │  373173 │  31055 │   419260 │
-│ 2022-08-01 │  344050 │  26323 │   415559 │
-│ 2022-09-01 │  306142 │  19826 │   375371 │
-│ 2022-10-01 │  213560 │  12614 │   332511 │
-│ 2022-11-01 │  144601 │   5886 │   187248 │
-│ 2022-12-01 │   73350 │   1925 │   106531 │
+│ 2022-01-01 │     750 │     15 │      619 │
+│ 2022-02-01 │     770 │     34 │      737 │
+│ 2022-03-01 │    1824 │    105 │     1858 │
+│ 2022-04-01 │    2200 │    176 │     2574 │
+│ 2022-05-01 │    4318 │    375 │     3772 │
+│ 2022-06-01 │    5478 │    366 │     4412 │
+│ 2022-07-01 │    4978 │    426 │     5576 │
+│ 2022-08-01 │    4598 │    370 │     5511 │
+│ 2022-09-01 │    4070 │    253 │     5028 │
+│ 2022-10-01 │    2849 │    168 │     4432 │
+│ 2022-11-01 │    1933 │     88 │     2482 │
+│ 2022-12-01 │     987 │     30 │     1408 │
 └────────────┴─────────┴────────┴──────────┘
 ```
 
@@ -445,20 +440,20 @@ WITH rides AS (
   ORDER BY decile ASC;
 ```
 ```
-┌──────┬──────────────────┐
-│ %ile │     duration     │
-├──────┼──────────────────┤
-│   10 │ 00:03:12         │
-│   20 │ 00:04:43         │
-│   30 │ 00:06:09         │
-│   40 │ 00:07:43         │
-│   50 │ 00:09:32         │
-│   60 │ 00:11:47         │
-│   70 │ 00:14:51         │
-│   80 │ 00:19:37         │
-│   90 │ 00:29:10         │
-│  100 │ 68 days 09:29:04 │
-└──────┴──────────────────┘
+┌──────┬─────────────────┐
+│ %ile │    duration     │
+├──────┼─────────────────┤
+│   10 │ 00:03:13        │
+│   20 │ 00:04:42        │
+│   30 │ 00:06:07        │
+│   40 │ 00:07:40        │
+│   50 │ 00:09:31        │
+│   60 │ 00:11:45        │
+│   70 │ 00:14:43        │
+│   80 │ 00:19:32        │
+│   90 │ 00:28:50        │
+│  100 │ 8 days 21:20:39 │
+└──────┴─────────────────┘
 ```
 
 The 100th percentile is likely bad data, but the rest is interesting! Most rides are under ten minutes, but one in ten exceeds a half-hour. Putting this in to a `MATERIALIZED VIEW` and refreshing it weekly might make a nice source for an office dashboard or other visualization.
