@@ -48,6 +48,7 @@ This list is somewhat ordered by likelihood of near-term delivery, or maybe diff
   - Columnar storage and storage type management — will enable some degree of compression and accelerate column-oriented analytics workloads
   - Periodic `REFRESH MATERIALIZED VIEW` — set schedules for background refresh of materialized views (useful for dashboarding, etc.)
   - Roll-off to `TABLESPACE` — as data ages, it will be moved into a specified table space
+  - Use of "tiered storage", i.e. moving older partitions to be stored in S3 rather than on-disk
   - Automatic `CLUSTER BY`/repack for non-live partitions
   - Migration tools — adapters for existing time-scale installations to ease migration and promote best practices in new table configuration
   - "Approximate" functions — maintain statistics within known error bounds without rescanning all data
