@@ -39,13 +39,19 @@ On the other hand, you may be worried about plugging a firehose of data into you
 
 Fortunately, it's incredibly easy to simply drop time-series partitions on a schedule. Call `set_ts_retention_policy` with your time-series table and an interval (say, `'90 days'`) to establish such a policy. Once an hour, any partitions falling entirely outside the retention window will be dropped. Use `clear_ts_retention_policy` to revert to the default behavior (infinite retention). Each of these functions will return the previous retention policy when called.
 
+### Compression
+
+Sometimes you know older data isn't queried very often, but still don't want to commit to just dropping older partitions. In this case, compression may be what you desire.
+
+By calling `set_ts_compression_policy` on a time-series table with an appropriate interval (perhaps`'1 month'`), this extension will take care of compressing partitions (using a columnar storage method) older than the specified interval, once an hour. As with the retention policy functionality, a function is also provided for clearing any existing policy (existing partitions will not be decompressed, however).
+
 ## Roadmap
 
 While `timeseries` is still in its early days, we have a concrete vision for the features we will be including in the future. Feedback on the importance of a given feature to customer use cases will help us better prioritize the following lists.
 
 This list is somewhat ordered by likelihood of near-term delivery, or maybe difficulty, but that property is only loosely intended and no guarantee of priority. Again, feedback from users will take precedence.
 
-  - Columnar storage and storage type management — will enable some degree of compression and accelerate column-oriented analytics workloads
+  - Assorted "analytic" functions frequently associated with time-series workloads
   - Periodic `REFRESH MATERIALIZED VIEW` — set schedules for background refresh of materialized views (useful for dashboarding, etc.)
   - Roll-off to `TABLESPACE` — as data ages, it will be moved into a specified table space
   - Use of "tiered storage", i.e. moving older partitions to be stored in S3 rather than on-disk

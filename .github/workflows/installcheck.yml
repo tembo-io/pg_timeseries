@@ -24,6 +24,22 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-common &&
           sudo sed -ri 's/#(create_main_cluster) .*$/\1 = false/' /etc/postgresql-common/createcluster.conf
 
+      # rust needed to install trunk
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install stoml and pg-trunk
+        shell: bash
+        run: |
+          set -xe
+          wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
+          mv stoml_linux_amd64 stoml
+          chmod +x stoml
+          sudo mv stoml /usr/local/bin/
+          cargo install pg-trunk
+
       - name: Install PostgreSQL and server-dev
         run: >
           sudo apt-get install -y --no-install-recommends \
@@ -31,9 +47,10 @@ jobs:
             postgresql-server-dev-${{matrix.pg_version}}
 
       - name: Install dependencies
-        run: >
-          sudo apt-get install -y --no-install-recommends \
-            postgresql-${{matrix.pg_version}}-partman
+        run: |
+          sudo ~/.cargo/bin/trunk install --pg-version=${{matrix.pg_version}} pg_partman
+          sudo ~/.cargo/bin/trunk install --pg-version=${{matrix.pg_version}} pg_cron
+          sudo ~/.cargo/bin/trunk install --pg-version=${{matrix.pg_version}} hydra_columnar
 
       - uses: actions/checkout@v3
 

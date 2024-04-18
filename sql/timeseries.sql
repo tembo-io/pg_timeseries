@@ -6,7 +6,8 @@ CREATE TABLE @extschema@.ts_config(
   table_id regclass PRIMARY KEY,
   partition_duration interval NOT NULL,
   partition_lead_time interval NOT NULL,
-  retention_duration interval);
+  retention_duration interval,
+  compression_duration interval);
 
 -- Enhances an existing table with our time-series best practices. Basically
 -- the entry point to this extension. Minimally, a user must create a table
@@ -157,8 +158,7 @@ $function$;
 --
 -- In the future, similar functions will manage schedules for moving partitions
 -- to non-default TABLESPACEs, issuing CLUSTER commands to reorganize data in
--- non-active partitions along a chosen index, or even applying compressed
--- storage methods and rollup logic.
+-- non-active partitions along a chosen index.
 --
 -- Returns the previous retention duration, or NULL if none was set.
 CREATE OR REPLACE
@@ -295,3 +295,117 @@ SELECT table_id,
        SUM(index_size_bytes) AS index_size_bytes,
        SUM(total_size_bytes) AS total_size_bytes
   FROM @extschema@.ts_part_info GROUP BY 1 ORDER BY 2 ASC;
+
+-- This function sets a compression policy on an existing time-series table, which
+-- ensures that all partitions older than a particular offset (from present) are
+-- automatically converted to a columnar storage mechanism, which offers some
+-- degree of data compression.
+--
+-- Returns the previous compression duration, or NULL if none was set.
+CREATE OR REPLACE FUNCTION @extschema@.set_ts_compression_policy(target_table_id regclass, new_compression interval)
+ RETURNS interval
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  table_name text;
+  prev_compression interval;
+BEGIN
+  SELECT compression_duration
+    INTO prev_compression
+    FROM @extschema@.ts_config
+    WHERE "table_id"=target_table_id
+    FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE object_not_in_prerequisite_state USING
+      MESSAGE = 'could not fetch compression policy',
+      DETAIL  = 'Target table was not time-series enhanced',
+      HINT    = format('Call %L to enable time-series enhancements', 'enable_ts_table');
+  END IF;
+
+  UPDATE @extschema@.ts_config
+    SET "compression_duration"=new_compression
+    WHERE "table_id"=target_table_id;
+
+  RETURN prev_compression;
+END;
+$function$;
+
+-- Unsets any compression policy on the specified table. Returns the old policy,
+-- if one was set.
+CREATE OR REPLACE
+FUNCTION @extschema@.clear_ts_compression_policy(target_table_id regclass)
+  RETURNS interval
+  LANGUAGE plpgsql
+AS $function$
+DECLARE
+  prev_compression interval;
+BEGIN
+  SELECT set_ts_compression_policy(target_table_id, NULL) INTO prev_compression;
+
+  RETURN prev_compression;
+END;
+$function$;
+
+-- This function implements the core of compression application: given a target table ID
+-- (which must be time-series enabled) and a compression offset, all partitions falling
+-- entirely behind the offset (from the present time) will be converted to using columnar
+-- storage. This function is "idempotent" in the sense that repeated calls will behave
+-- identically given the same wall clock time and arguments.
+CREATE OR REPLACE FUNCTION @extschema@.apply_compression_policy(target_table_id regclass, comp_offset interval)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+table_name text;
+part_row record;
+part_beg timestamptz;
+part_end timestamptz;
+part_am name;
+BEGIN
+  IF comp_offset IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT format('%s.%s', n.nspname, c.relname)
+  INTO table_name
+  FROM pg_class c
+  LEFT JOIN pg_namespace n
+    ON n.oid = c.relnamespace
+  WHERE c.oid=target_table_id;
+
+  FOR part_row IN
+    SELECT
+      partition_schemaname,
+      partition_tablename
+    FROM @extschema@.show_partitions(table_name, 'ASC')
+    LOOP
+      SELECT child_start_time, child_end_time
+        INTO part_beg, part_end
+        FROM @extschema@.show_partition_info(
+          part_row.partition_schemaname || '.' ||
+          part_row.partition_tablename);
+
+      SELECT am.amname
+        INTO part_am
+        FROM pg_class c, pg_am am
+        WHERE c.oid = (part_row.partition_schemaname || '.' ||
+                       part_row.partition_tablename)::regclass AND
+              c.relam = am.oid;
+
+    IF part_am <> 'columnar' AND
+       part_end < (now() - comp_offset) THEN
+      PERFORM columnar.alter_table_set_access_method(
+        part_row.partition_schemaname || '.' ||
+        part_row.partition_tablename, 'columnar');
+      EXECUTE format('ALTER TABLE %I ATTACH PARTITION %I.%I FOR VALUES FROM (%L) TO (%L)', target_table_id, part_row.partition_schemaname, part_row.partition_tablename, part_beg, part_end);
+    END IF;
+  END LOOP;
+END;
+$function$;
+
+-- Since we're using pg_cron, might as well schedule the maintenance through its bgw
+-- rather than run a duplicate one through pg_partman.
+SELECT cron.schedule('partman-maintenance', '@hourly', $$SELECT partman.run_maintenance();$$);
+
+-- Scan the time-series config table and apply compression policies once an hour.
+SELECT cron.schedule('timeseries-compression', '@hourly', $$SELECT @extschema@.apply_compression_policy(table_id, compression_duration) FROM ts_config;$$);

@@ -1,10 +1,7 @@
 \set SHOW_CONTEXT never
-BEGIN;
-CREATE SCHEMA partman;
-CREATE EXTENSION IF NOT EXISTS pg_partman WITH SCHEMA partman CASCADE;
-CREATE EXTENSION timeseries;
-ROLLBACK;
 CREATE EXTENSION timeseries CASCADE;
+NOTICE:  installing required extension "columnar"
+NOTICE:  installing required extension "pg_cron"
 NOTICE:  installing required extension "pg_partman"
 CREATE TABLE simple ();
 SELECT enable_ts_table('simple');
