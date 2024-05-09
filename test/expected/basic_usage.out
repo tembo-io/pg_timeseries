@@ -137,3 +137,38 @@ SELECT COUNT(*) < 10 AS fewer_partitions FROM ts_part_info;
  t
 (1 row)
 
+CREATE TABLE events (
+  user_id bigint,
+  event_id bigint,
+  event_time timestamptz,
+  value float
+);
+COPY events FROM STDIN WITH (FORMAT 'csv');
+SELECT first(value, event_time), user_id FROM events GROUP BY user_id;
+ first | user_id 
+-------+---------
+   1.7 |       2
+   1.1 |       1
+(2 rows)
+
+SELECT last(value, event_time), user_id FROM events GROUP BY user_id;
+ last | user_id 
+------+---------
+  2.2 |       2
+  1.6 |       1
+(2 rows)
+
+SELECT first(event_id, event_time), user_id FROM events GROUP BY user_id;
+ first | user_id 
+-------+---------
+     7 |       2
+     1 |       1
+(2 rows)
+
+SELECT last(event_id, event_time), user_id FROM events GROUP BY user_id;
+ last | user_id 
+------+---------
+   12 |       2
+    6 |       1
+(2 rows)
+
