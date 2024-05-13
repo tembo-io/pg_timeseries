@@ -496,3 +496,107 @@ CREATE OR REPLACE AGGREGATE last(value anyelement, rank anycompatible) (
     FINALFUNC = endpoint_final,
     FINALFUNC_EXTRA
 );
+
+
+-- When provided with a table, interval, and time range,
+-- this function will bin all data within the specified
+-- range into rows spaced according to the stride.
+--
+-- Time bins which lack data in the input table will still
+-- receive a single row of output with NULLs in columns
+-- other than that row's date bin value.
+CREATE OR REPLACE FUNCTION public.date_bin_table (target_table_elem anyelement, time_stride interval, time_range tstzrange)
+  RETURNS SETOF anyelement
+  LANGUAGE plpgsql
+AS $function$
+#print_strict_params on
+DECLARE
+  target_table_id regclass;
+  tl_sql text;
+  part_col_name name;
+  part_col_type regtype;
+  col_name name;
+  prev_lead_time interval;
+  part_duration interval;
+  leading_partitions numeric;
+BEGIN
+  SELECT oid INTO target_table_id
+  FROM pg_class cl
+  WHERE reltype=pg_typeof(target_table_elem);
+
+  RAISE NOTICE 'target_table_id = %', target_table_id;
+
+  SELECT
+    at.attname,
+    format_type(at.atttypid, at.atttypmod)::regtype
+    INTO STRICT part_col_name, part_col_type
+  FROM  (
+      SELECT partrelid, unnest(pt.partattrs) partattnum
+      FROM   pg_partitioned_table pt
+      WHERE  pt.partrelid = target_table_id
+      ) pat
+  JOIN pg_attribute at ON at.attrelid = pat.partrelid AND
+                          at.attnum = pat.partattnum;
+
+  RAISE NOTICE 'part_col_name = %', part_col_name;
+  RAISE NOTICE 'part_col_type = %', part_col_type;
+
+  FOR col_name IN
+    SELECT attname FROM pg_attribute
+    WHERE attnum > 0 AND
+          NOT attisdropped AND
+          attrelid=target_table_id
+    ORDER BY attnum ASC
+  LOOP
+    RAISE NOTICE 'col_name = %', col_name;
+
+    IF col_name = part_col_name
+    THEN
+      tl_sql := format('%sCAST(date_series.date AS %s) %I, ', tl_sql, part_col_type, col_name);
+    ELSE
+      tl_sql := format('%sdata.%I, ', tl_sql, col_name);
+    END IF;
+
+  RAISE NOTICE 'tl_sql: %', tl_sql;
+  END LOOP;
+
+  tl_sql := rtrim(tl_sql, ', ');
+  RAISE NOTICE 'final tl_sql: %', tl_sql;
+
+  RETURN QUERY EXECUTE format($query$
+      WITH data AS (
+        SELECT *, date_bin($1, %I, $2) binned_date
+        FROM %I
+        WHERE %I BETWEEN $2 AND $3
+        ORDER BY binned_date
+      )
+      SELECT %s
+      FROM generate_series($2, $3, $1) date_series(date)
+      LEFT JOIN data
+      ON data.binned_date = date_series.date;$query$,
+    part_col_name,
+    target_table_id,
+    part_col_name,
+    tl_sql)
+  USING time_stride, lower(time_range), upper(time_range);
+  RETURN;
+END;
+$function$;
+
+-- Function implementation for LOCF: last-observed carry-forward.
+-- Intended for use on the output of date_bin_table in order to
+-- fill NULL rows with the last observed value.
+CREATE OR REPLACE FUNCTION public.locf_agg(state anyelement, value anyelement)
+ RETURNS anyelement
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  RETURN COALESCE(value, state);
+END;
+$function$;
+
+-- Aggregate for LOCF. For use in a WINDOW clause
+CREATE AGGREGATE locf(anyelement) (
+  SFUNC = locf_agg,
+  STYPE = anyelement
+);
