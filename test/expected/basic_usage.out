@@ -65,6 +65,12 @@ SELECT COUNT(*) > 10 AS has_partitions FROM ts_part_info;
  t
 (1 row)
 
+SELECT COUNT(*) > 0 AS "compressed?" FROM ts_part_info WHERE access_method = 'columnar';
+ compressed? 
+-------------
+ f
+(1 row)
+
 SELECT set_ts_retention_policy('measurements', '90 days');
  set_ts_retention_policy 
 -------------------------
@@ -119,7 +125,19 @@ SELECT premake FROM part_config WHERE parent_table='public.measurements';
        1
 (1 row)
 
-SELECT set_ts_retention_policy('measurements', '1 days');
+SELECT apply_compression_policy('measurements', '1 day');
+ apply_compression_policy 
+--------------------------
+ 
+(1 row)
+
+SELECT COUNT(*) > 0 AS "compressed?" FROM ts_part_info WHERE access_method = 'columnar';
+ compressed? 
+-------------
+ t
+(1 row)
+
+SELECT set_ts_retention_policy('measurements', '1 day');
  set_ts_retention_policy 
 -------------------------
  
@@ -140,9 +158,15 @@ SELECT COUNT(*) < 10 AS fewer_partitions FROM ts_part_info;
 CREATE TABLE events (
   user_id bigint,
   event_id bigint,
-  event_time timestamptz,
+  event_time timestamptz NOT NULL,
   value float
-);
+) PARTITION BY RANGE (event_time);
+SELECT enable_ts_table('events');
+ enable_ts_table 
+-----------------
+ 
+(1 row)
+
 COPY events FROM STDIN WITH (FORMAT 'csv');
 SELECT first(value, event_time), user_id FROM events GROUP BY user_id;
  first | user_id 
@@ -171,4 +195,26 @@ SELECT last(event_id, event_time), user_id FROM events GROUP BY user_id;
    12 |       2
     6 |       1
 (2 rows)
+
+SELECT last(user_id, value) top_performer,
+       locf(avg(value)) OVER (ORDER BY event_time),
+       event_time
+FROM date_bin_table(NULL::events, '1 minute',
+                    '[2020-11-04 15:50:00-08, 2020-11-04 16:00:00-08]')
+GROUP BY 3
+ORDER BY 3;
+ top_performer |        locf        |          event_time          
+---------------+--------------------+------------------------------
+               |                    | Wed Nov 04 15:50:00 2020 PST
+             2 |                1.4 | Wed Nov 04 15:51:00 2020 PST
+               |                1.4 | Wed Nov 04 15:52:00 2020 PST
+             2 |                1.5 | Wed Nov 04 15:53:00 2020 PST
+               |                1.5 | Wed Nov 04 15:54:00 2020 PST
+             2 |                1.6 | Wed Nov 04 15:55:00 2020 PST
+               |                1.6 | Wed Nov 04 15:56:00 2020 PST
+             2 |                1.7 | Wed Nov 04 15:57:00 2020 PST
+             2 |                1.8 | Wed Nov 04 15:58:00 2020 PST
+             2 | 1.9000000000000001 | Wed Nov 04 15:59:00 2020 PST
+               | 1.9000000000000001 | Wed Nov 04 16:00:00 2020 PST
+(11 rows)
 

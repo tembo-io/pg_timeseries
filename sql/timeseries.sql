@@ -281,11 +281,13 @@ SELECT pt.parentrelid as table_id,
        pg_get_expr(c.relpartbound, c.oid) AS part_range,
        pg_table_size(pt.relid) AS table_size_bytes,
        pg_indexes_size(pt.relid) AS index_size_bytes,
-       pg_total_relation_size(pt.relid) AS total_size_bytes
+       pg_total_relation_size(pt.relid) AS total_size_bytes,
+       am.amname AS access_method
   FROM @extschema@.ts_config tsc,
        pg_partition_tree(tsc.table_id) pt,
-       pg_class c
-  WHERE pt.isleaf AND pt.relid = c.oid
+       pg_class c,
+       pg_am am
+  WHERE pt.isleaf AND pt.relid = c.oid AND c.relam = am.oid
   ORDER BY 2 ASC;
 
 -- Unlike the above view, this sums partitions for each time-series table.
@@ -495,4 +497,118 @@ CREATE OR REPLACE AGGREGATE last(value anyelement, rank anycompatible) (
     STYPE = text[],
     FINALFUNC = endpoint_final,
     FINALFUNC_EXTRA
+);
+
+-- When provided with a table, interval, and time range,
+-- this function will bin all data within the specified
+-- range into rows spaced according to the stride.
+--
+-- Time bins which lack data in the input table will still
+-- receive a single row of output with NULLs in columns
+-- other than that row's date bin value.
+--
+-- The target table must be time-series enabled.
+CREATE OR REPLACE FUNCTION @extschema@.date_bin_table (target_table_elem anyelement, time_stride interval, time_range tstzrange)
+  RETURNS SETOF anyelement
+  LANGUAGE plpgsql
+AS $function$
+#print_strict_params on
+DECLARE
+  target_table_id regclass;
+  tl_sql text;
+  part_col_name name;
+  part_col_type regtype;
+  col_name name;
+  prev_lead_time interval;
+  part_duration interval;
+  leading_partitions numeric;
+BEGIN
+  SELECT oid INTO target_table_id
+  FROM pg_class cl
+  WHERE reltype=pg_typeof(target_table_elem);
+
+  IF target_table_id IS NULL THEN
+    RAISE invalid_parameter_value USING
+      MESSAGE = 'invalid table type',
+      DETAIL  = 'Target table element must be a table type',
+      HINT    = 'Provide a value with a type corresponding to the table to query.';
+  END IF;
+
+  PERFORM *
+    FROM @extschema@.ts_config
+    WHERE "table_id"=target_table_id;
+  IF NOT FOUND THEN
+    RAISE object_not_in_prerequisite_state USING
+      MESSAGE = 'target table must be time-series enhanced',
+      DETAIL  = 'Cannot query tables without time-series enhancements',
+      HINT    = format('Call %L to enable time-series enhancements', 'enable_ts_table');
+  END IF;
+
+  SELECT
+    at.attname,
+    format_type(at.atttypid, at.atttypmod)::regtype
+    INTO STRICT part_col_name, part_col_type
+  FROM  (
+      SELECT partrelid, unnest(pt.partattrs) partattnum
+      FROM   pg_partitioned_table pt
+      WHERE  pt.partrelid = target_table_id
+      ) pat
+  JOIN pg_attribute at ON at.attrelid = pat.partrelid AND
+                          at.attnum = pat.partattnum;
+
+  FOR col_name IN
+    SELECT attname FROM pg_attribute
+    WHERE attnum > 0 AND
+          NOT attisdropped AND
+          attrelid=target_table_id
+    ORDER BY attnum ASC
+  LOOP
+    IF col_name = part_col_name
+    THEN
+      tl_sql := format('%sCAST(date_series.date AS %s) %I, ',
+                       tl_sql, part_col_type, col_name);
+    ELSE
+      tl_sql := format('%sdata.%I, ',
+                       tl_sql, col_name);
+    END IF;
+  END LOOP;
+
+  tl_sql := rtrim(tl_sql, ', ');
+
+  RETURN QUERY EXECUTE format($query$
+      WITH data AS (
+        SELECT *, date_bin($1, %I, $2) binned_date
+        FROM %I
+        WHERE %I BETWEEN $2 AND $3
+        ORDER BY binned_date
+      )
+      SELECT %s
+      FROM generate_series($2, $3, $1) date_series(date)
+      LEFT JOIN data
+      ON data.binned_date = date_series.date;$query$,
+    part_col_name,
+    target_table_id,
+    part_col_name,
+    tl_sql)
+  USING time_stride, lower(time_range), upper(time_range);
+  RETURN;
+END;
+$function$;
+
+-- Function implementation for LOCF: last-observed carry-forward.
+-- Intended for use on the output of date_bin_table in order to
+-- fill NULL rows with the last observed value.
+CREATE OR REPLACE FUNCTION @extschema@.locf_agg(state anyelement, value anyelement)
+ RETURNS anyelement
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  RETURN COALESCE(value, state);
+END;
+$function$;
+
+-- Aggregate for LOCF. For use in a WINDOW clause
+CREATE AGGREGATE locf(anyelement) (
+  SFUNC = locf_agg,
+  STYPE = anyelement
 );

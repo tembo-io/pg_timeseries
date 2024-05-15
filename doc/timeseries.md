@@ -50,6 +50,41 @@ Sometimes you know older data isn't queried very often, but still don't want to 
 
 By calling `set_ts_compression_policy` on a time-series table with an appropriate interval (perhaps`'1 month'`), this extension will take care of compressing partitions (using a columnar storage method) older than the specified interval, once an hour. As with the retention policy functionality, a function is also provided for clearing any existing policy (existing partitions will not be decompressed, however).
 
+### Analytics Helpers
+
+This extension includes several functions intended to make writing correct time-series queries easier. Certain concepts can be difficult to express in standard SQL and helper functions can aid in readability and maintainability.
+
+#### `first` and `last`
+
+These two functions help clean up the syntax of a fairly common pattern: a query is grouped by one dimension, but a user wants to know what the first or last row in a group is when ordered by a _different_ dimension.
+
+For instance, you might have a cloud computing platform reporting metrics and wish to know the latest (in time) CPU utilization metric for each machine in the platform:
+
+```sql
+SELECT machine_id,
+       last(cpu_util, recorded_at)
+FROM events
+GROUP BY machine_id;
+```
+
+#### `date_bin_table`
+
+This function automates the tedium of aligning time-series values to a given width, or "stride", and makes sure to include NULL rows for any time periods where the source table has no data points.
+
+It must be called against a time-series table, but apart from that consideration using it is pretty straightforward:
+
+```sql
+SELECT * FROM date_bin_table(NULL::target_table, '1 hour');
+```
+
+The output of this query will differ from simply hitting the target table directly in three ways:
+
+  * Rows will be sorted by time, ascending
+  * The time column's values will be binned to the provided width
+  * Extra rows will be added for periods with no data. They will include the time stamp for that bin and NULL in all other columns
+
+
+
 ## Roadmap
 
 While `timeseries` is still in its early days, we have a concrete vision for the features we will be including in the future. Feedback on the importance of a given feature to customer use cases will help us better prioritize the following lists.
