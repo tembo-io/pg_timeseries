@@ -281,11 +281,13 @@ SELECT pt.parentrelid as table_id,
        pg_get_expr(c.relpartbound, c.oid) AS part_range,
        pg_table_size(pt.relid) AS table_size_bytes,
        pg_indexes_size(pt.relid) AS index_size_bytes,
-       pg_total_relation_size(pt.relid) AS total_size_bytes
+       pg_total_relation_size(pt.relid) AS total_size_bytes,
+       am.amname AS access_method
   FROM @extschema@.ts_config tsc,
        pg_partition_tree(tsc.table_id) pt,
-       pg_class c
-  WHERE pt.isleaf AND pt.relid = c.oid
+       pg_class c,
+       pg_am am
+  WHERE pt.isleaf AND pt.relid = c.oid AND c.relam = am.oid
   ORDER BY 2 ASC;
 
 -- Unlike the above view, this sums partitions for each time-series table.
@@ -506,7 +508,7 @@ CREATE OR REPLACE AGGREGATE last(value anyelement, rank anycompatible) (
 -- other than that row's date bin value.
 --
 -- The target table must be time-series enabled.
-CREATE OR REPLACE FUNCTION public.date_bin_table (target_table_elem anyelement, time_stride interval, time_range tstzrange)
+CREATE OR REPLACE FUNCTION @extschema@.date_bin_table (target_table_elem anyelement, time_stride interval, time_range tstzrange)
   RETURNS SETOF anyelement
   LANGUAGE plpgsql
 AS $function$
@@ -533,7 +535,7 @@ BEGIN
   END IF;
 
   PERFORM *
-    FROM public.ts_config
+    FROM @extschema@.ts_config
     WHERE "table_id"=target_table_id;
   IF NOT FOUND THEN
     RAISE object_not_in_prerequisite_state USING
@@ -596,7 +598,7 @@ $function$;
 -- Function implementation for LOCF: last-observed carry-forward.
 -- Intended for use on the output of date_bin_table in order to
 -- fill NULL rows with the last observed value.
-CREATE OR REPLACE FUNCTION public.locf_agg(state anyelement, value anyelement)
+CREATE OR REPLACE FUNCTION @extschema@.locf_agg(state anyelement, value anyelement)
  RETURNS anyelement
  LANGUAGE plpgsql
 AS $function$

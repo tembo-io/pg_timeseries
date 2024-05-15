@@ -32,6 +32,7 @@ SELECT partition_duration, partition_lead_time FROM ts_config ORDER BY table_id:
 SELECT partition_interval, premake FROM part_config WHERE parent_table='public.measurements';
 
 SELECT COUNT(*) > 10 AS has_partitions FROM ts_part_info;
+SELECT COUNT(*) > 0 AS "compressed?" FROM ts_part_info WHERE access_method = 'columnar';
 
 SELECT set_ts_retention_policy('measurements', '90 days');
 SELECT retention_duration FROM ts_config WHERE table_id='measurements'::regclass;
@@ -45,7 +46,10 @@ SELECT set_ts_lead_time('measurements', '1 day');
 SELECT partition_lead_time FROM ts_config WHERE table_id='measurements'::regclass;
 SELECT premake FROM part_config WHERE parent_table='public.measurements';
 
-SELECT set_ts_retention_policy('measurements', '1 days');
+SELECT apply_compression_policy('measurements', '1 day');
+SELECT COUNT(*) > 0 AS "compressed?" FROM ts_part_info WHERE access_method = 'columnar';
+
+SELECT set_ts_retention_policy('measurements', '1 day');
 SELECT run_maintenance();
 SELECT COUNT(*) < 10 AS fewer_partitions FROM ts_part_info;
 

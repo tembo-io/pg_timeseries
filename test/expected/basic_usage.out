@@ -65,6 +65,12 @@ SELECT COUNT(*) > 10 AS has_partitions FROM ts_part_info;
  t
 (1 row)
 
+SELECT COUNT(*) > 0 AS "compressed?" FROM ts_part_info WHERE access_method = 'columnar';
+ compressed? 
+-------------
+ f
+(1 row)
+
 SELECT set_ts_retention_policy('measurements', '90 days');
  set_ts_retention_policy 
 -------------------------
@@ -119,7 +125,19 @@ SELECT premake FROM part_config WHERE parent_table='public.measurements';
        1
 (1 row)
 
-SELECT set_ts_retention_policy('measurements', '1 days');
+SELECT apply_compression_policy('measurements', '1 day');
+ apply_compression_policy 
+--------------------------
+ 
+(1 row)
+
+SELECT COUNT(*) > 0 AS "compressed?" FROM ts_part_info WHERE access_method = 'columnar';
+ compressed? 
+-------------
+ t
+(1 row)
+
+SELECT set_ts_retention_policy('measurements', '1 day');
  set_ts_retention_policy 
 -------------------------
  
