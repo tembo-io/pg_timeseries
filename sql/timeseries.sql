@@ -497,7 +497,6 @@ CREATE OR REPLACE AGGREGATE last(value anyelement, rank anycompatible) (
     FINALFUNC_EXTRA
 );
 
-
 -- When provided with a table, interval, and time range,
 -- this function will bin all data within the specified
 -- range into rows spaced according to the stride.
@@ -505,6 +504,8 @@ CREATE OR REPLACE AGGREGATE last(value anyelement, rank anycompatible) (
 -- Time bins which lack data in the input table will still
 -- receive a single row of output with NULLs in columns
 -- other than that row's date bin value.
+--
+-- The target table must be time-series enabled.
 CREATE OR REPLACE FUNCTION public.date_bin_table (target_table_elem anyelement, time_stride interval, time_range tstzrange)
   RETURNS SETOF anyelement
   LANGUAGE plpgsql
@@ -524,7 +525,22 @@ BEGIN
   FROM pg_class cl
   WHERE reltype=pg_typeof(target_table_elem);
 
-  RAISE NOTICE 'target_table_id = %', target_table_id;
+  IF target_table_id IS NULL THEN
+    RAISE invalid_parameter_value USING
+      MESSAGE = 'invalid table type',
+      DETAIL  = 'Target table element must be a table type',
+      HINT    = 'Provide a value with a type corresponding to the table to query.';
+  END IF;
+
+  PERFORM *
+    FROM public.ts_config
+    WHERE "table_id"=target_table_id;
+  IF NOT FOUND THEN
+    RAISE object_not_in_prerequisite_state USING
+      MESSAGE = 'target table must be time-series enhanced',
+      DETAIL  = 'Cannot query tables without time-series enhancements',
+      HINT    = format('Call %L to enable time-series enhancements', 'enable_ts_table');
+  END IF;
 
   SELECT
     at.attname,
@@ -538,9 +554,6 @@ BEGIN
   JOIN pg_attribute at ON at.attrelid = pat.partrelid AND
                           at.attnum = pat.partattnum;
 
-  RAISE NOTICE 'part_col_name = %', part_col_name;
-  RAISE NOTICE 'part_col_type = %', part_col_type;
-
   FOR col_name IN
     SELECT attname FROM pg_attribute
     WHERE attnum > 0 AND
@@ -548,20 +561,17 @@ BEGIN
           attrelid=target_table_id
     ORDER BY attnum ASC
   LOOP
-    RAISE NOTICE 'col_name = %', col_name;
-
     IF col_name = part_col_name
     THEN
-      tl_sql := format('%sCAST(date_series.date AS %s) %I, ', tl_sql, part_col_type, col_name);
+      tl_sql := format('%sCAST(date_series.date AS %s) %I, ',
+                       tl_sql, part_col_type, col_name);
     ELSE
-      tl_sql := format('%sdata.%I, ', tl_sql, col_name);
+      tl_sql := format('%sdata.%I, ',
+                       tl_sql, col_name);
     END IF;
-
-  RAISE NOTICE 'tl_sql: %', tl_sql;
   END LOOP;
 
   tl_sql := rtrim(tl_sql, ', ');
-  RAISE NOTICE 'final tl_sql: %', tl_sql;
 
   RETURN QUERY EXECUTE format($query$
       WITH data AS (
