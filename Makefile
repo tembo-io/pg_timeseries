@@ -5,7 +5,7 @@ EXTVERSION   = $(shell grep -m 1 '[[:space:]]\{6\}"version":' META.json | \
 DISTVERSION  = $(shell grep -m 1 '[[:space:]]\{3\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
-EXTVERSIONS = 0.1.3
+EXTVERSIONS = 0.1.4
 
 DATA 		 = $(wildcard sql/*--*.sql)
 DATA_built   = $(foreach v,$(EXTVERSIONS),sql/$(EXTENSION)--$(v).sql)
@@ -30,5 +30,5 @@ latest-changes.md: Changes
 
 # generate each version's file installation file by concatenating
 # previous upgrade scripts
-sql/$(EXTENSION)--0.1.3.sql: sql/$(EXTENSION).sql
+sql/$(EXTENSION)--0.1.4.sql: sql/$(EXTENSION).sql
 	cat $^ > $@
