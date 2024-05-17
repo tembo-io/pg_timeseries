@@ -1,5 +1,5 @@
 # time series extension
 comment = 'Convenience API for Tembo time series stack'
-default_version = '0.1.4'
+default_version = '0.1.5'
 module_pathname = '$libdir/timeseries'
 requires = 'columnar, pg_cron, pg_partman'

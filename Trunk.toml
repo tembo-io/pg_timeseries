@@ -6,7 +6,7 @@ description = "Open source timeseries extension for Postgres."
 homepage = "https://github.com/tembo-io/pg_timeseries"
 documentation = "https://github.com/tembo-io/pg_timeseries"
 categories = ["analytics"]
-version = "0.1.4"
+version = "0.1.5"
 
 [build]
 postgres_version = "15"
