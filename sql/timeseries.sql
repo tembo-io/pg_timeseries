@@ -407,7 +407,7 @@ $function$;
 
 -- Since we're using pg_cron, might as well schedule the maintenance through its bgw
 -- rather than run a duplicate one through pg_partman.
-SELECT cron.schedule('partman-maintenance', '@hourly', $$SELECT partman.run_maintenance();$$);
+SELECT cron.schedule('partman-maintenance', '@hourly', $$SELECT run_maintenance();$$);
 
 -- Scan the time-series config table and apply compression policies once an hour.
 SELECT cron.schedule('timeseries-compression', '@hourly', $$SELECT @extschema@.apply_compression_policy(table_id, compression_duration) FROM ts_config;$$);
