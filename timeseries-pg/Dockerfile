@@ -46,5 +46,7 @@ FROM postgres:16.3-bookworm
 COPY --from=builder /usr/share/postgresql/16/extension /usr/share/postgresql/16/extension
 COPY --from=builder /usr/lib/postgresql/16/lib /usr/lib/postgresql/16/lib
 
-COPY timeseries.conf /usr/share/postgresql/16/postgresql.conf.sample
+COPY timeseries.conf .
+RUN cat timeseries.conf >> /usr/share/postgresql/16/postgresql.conf.sample
+
 USER postgres
