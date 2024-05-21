@@ -7,9 +7,34 @@ The purpose of this extension is to provide a cohesive user experience around th
 [![Static Badge](https://img.shields.io/badge/%40tembo-community?logo=slack&label=slack)](https://join.slack.com/t/tembocommunity/shared_invite/zt-277pu7chi-NHtvHWvLhHwyK0Y5Y6vTPw)
 [![OSSRank](https://shields.io/endpoint?url=https://ossrank.com/shield/4022)](https://ossrank.com/p/4022)
 
-## Getting Started
+## Installation
 
 This extension relies on the presence and configuration of `pg_partman`. Once you have determined which table needs time-series enhancement, simply call the `enable_ts_table` function with your table name and the name of the column that stores the time for each row:
+
+### Running with docker
+
+Start a Docker container running Postgres with `pg_timeseries` pre-installed.
+
+```bash
+docker run -d --name pg-timeseries -p 5432:5432 -e POSTGRES_PASSWORD=postgres quay.io/tembo/timeseries-pg:latest
+```
+
+Then connect to the database and enable the extension:
+
+```bash
+psql postgres://postgres:postgres@localhost:5432/postgres
+```
+
+```sql
+CREATE EXTENSION timeseries CASCADE;
+```
+
+```text
+NOTICE:  installing required extension "columnar"
+NOTICE:  installing required extension "pg_cron"
+NOTICE:  installing required extension "pg_partman"
+CREATE EXTENSION
+```
 
 ```sql
 SELECT enable_ts_table('sensor_readings');
