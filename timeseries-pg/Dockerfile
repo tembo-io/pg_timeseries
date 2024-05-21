@@ -14,12 +14,6 @@ RUN apt-get update \
 
 WORKDIR /timeseries
 
-# Install Rust dependencies
-USER root
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-RUN $HOME/.cargo/bin/rustup default stable
-# install trunk cli
-RUN $HOME/.cargo/bin/cargo install pg-trunk
 # install all extensions
 RUN git clone https://github.com/citusdata/pg_cron.git && \
 	cd pg_cron && \
