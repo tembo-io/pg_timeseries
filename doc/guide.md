@@ -6,7 +6,7 @@ In this guide, you will become familiar with the functions and features of the t
 
 You'll need a PostgreSQL instance running timeseries `0.1.5` or later. An easy way to have one set up for you is to deploy one from Tembo Cloud [here](https://cloud.tembo.io). The free tier will perform well enough for the data set we'll be using.
 
-Once that's up and running, you'll need a client machine with `psql` (to connect to your database) and [the Divvy dataset](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-slim.csv.gz), which will total about 50MiB of CSV after decompression.
+Once that's up and running, you'll need a client machine with `psql` (to connect to your database) and [the Divvy dataset](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-slim.csv), which will total about 50MiB of CSV after decompression.
 
 _Note: If you'd like a larger data set, the above set is a downsampled version of [this file](https://tembo-demo-bucket.s3.amazonaws.com/202004--202402-divvy-tripdata-full.csv.gz), which covers the same time range but has 75 times as many trips._
 

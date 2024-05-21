@@ -45,3 +45,65 @@ jobs:
         env:
           TRUNK_API_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
         run: ~/.cargo/bin/trunk publish
+  build_and_push:
+    name: Build and push images
+    env:
+      TARGET_PLATFORMS: linux/amd64,linux/arm64
+    runs-on:
+      - self-hosted
+      - dind
+      - large-8x8
+    outputs:
+      short_sha: ${{ steps.versions.outputs.SHORT_SHA }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stoml
+        shell: bash
+        run: |
+         set -xe
+         wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
+         mv stoml_linux_amd64 stoml
+         chmod +x stoml
+         sudo mv stoml /usr/local/bin/
+      - name: Set version strings
+        id: versions
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "TAG_VER=$(/usr/local/bin/stoml Trunk.toml extension.version)" >> $GITHUB_OUTPUT
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Quay
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io/tembo
+          username: ${{ secrets.QUAY_USER_TEMBO }}
+          password: ${{ secrets.QUAY_PASSWORD_TEMBO }}
+
+      - name: Build and push -- Commit
+        # publish image for ever commit
+        if: github.event_name != 'release'
+        uses: docker/build-push-action@v5
+        with:
+          file: ./timeseries-pg/Dockerfile
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            quay.io/tembo/timeseries-pg:v${{ steps.versions.outputs.SHORT_SHA }}
+
+      - name: Build and push
+        # publish latest and TAG for releases
+        if: github.event_name == 'release'
+        uses: docker/build-push-action@v5
+        with:
+          file: ./timeseries-pg/Dockerfile
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            quay.io/tembo/timeseries-pg:v${{ steps.versions.outputs.TAG_VER }}
+            quay.io/tembo/timeseries-pg:latest
