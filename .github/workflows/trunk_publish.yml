@@ -46,8 +46,6 @@ jobs:
           TRUNK_API_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
         run: ~/.cargo/bin/trunk publish
   build_and_push:
-    # requires the publish stage since the image build runs `trunk install`
-    needs: publish
     name: Build and push images
     env:
       TARGET_PLATFORMS: linux/amd64,linux/arm64
