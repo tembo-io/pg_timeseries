@@ -92,7 +92,7 @@ jobs:
         with:
           file: ./images/timeseries-pg/Dockerfile
           context: .
-          platforms: linux/amd64, linux/arm64
+          platforms: linux/amd64
           push: true
           tags: |
             quay.io/tembo/timeseries-pg:v${{ steps.versions.outputs.SHORT_SHA }}
@@ -104,7 +104,7 @@ jobs:
         with:
           file: ./images/timeseries-pg/Dockerfile
           context: .
-          platforms: linux/amd64, linux/arm664
+          platforms: linux/amd64
           push: true
           tags: |
             quay.io/tembo/timeseries-pg:v${{ steps.versions.outputs.TAG_VER }}
