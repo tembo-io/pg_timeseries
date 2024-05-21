@@ -14,7 +14,7 @@ DOCS         = $(wildcard doc/*.md)
 TESTS        = $(wildcard test/sql/*.sql)
 REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --temp-config=./timeseries.conf --temp-instance=./tmp_check --inputdir=test
-PG_CONFIG = pg_config
+PG_CONFIG ?= pg_config
 EXTRA_CLEAN = sql/$(EXTENSION)--$(EXTVERSION).sql
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
