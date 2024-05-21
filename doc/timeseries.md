@@ -9,8 +9,6 @@ The purpose of this extension is to provide a cohesive user experience around th
 
 ## Installation
 
-This extension relies on the presence and configuration of `pg_partman`. Once you have determined which table needs time-series enhancement, simply call the `enable_ts_table` function with your table name and the name of the column that stores the time for each row:
-
 ### Running with docker
 
 Start a Docker container running Postgres with `pg_timeseries` pre-installed.
@@ -35,6 +33,10 @@ NOTICE:  installing required extension "pg_cron"
 NOTICE:  installing required extension "pg_partman"
 CREATE EXTENSION
 ```
+
+## Getting Started
+
+Once you have determined which table needs time-series enhancement, simply call the `enable_ts_table` function with your table name and the name of the column that stores the time for each row:
 
 ```sql
 SELECT enable_ts_table('sensor_readings');
