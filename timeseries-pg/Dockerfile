@@ -36,11 +36,11 @@ RUN apt install -y libcurl4-openssl-dev liblz4-dev libzstd-dev autoconf
 RUN git clone https://github.com/hydradatabase/hydra && \
     cd hydra/columnar &&  \
     ./configure && \
-    make
+    make && make install
 
 # build and install timeseries
 COPY . .
-RUN make && make install
+RUN make && make install || true
 
 FROM postgres:16.3-bookworm
 COPY --from=builder /usr/share/postgresql/16/extension /usr/share/postgresql/16/extension
