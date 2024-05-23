@@ -101,7 +101,7 @@ This function automates the tedium of aligning time-series values to a given wid
 It must be called against a time-series table, but apart from that consideration using it is pretty straightforward:
 
 ```sql
-SELECT * FROM date_bin_table(NULL::target_table, '1 hour');
+SELECT * FROM date_bin_table(NULL::target_table, '1 hour', '[2024-02-01 00:00, 2024-02-02 15:00]');
 ```
 
 The output of this query will differ from simply hitting the target table directly in three ways:
