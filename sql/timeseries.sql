@@ -429,7 +429,7 @@ BEGIN
     RETURN new_state;
   END IF;
 
-  SELECT state[2] INTO old_rank;
+  old_rank := state[2];
   IF (state IS NULL) OR
      (rank < old_rank) THEN
     new_state := ARRAY[value::text, rank::text];
@@ -453,7 +453,7 @@ BEGIN
     RETURN new_state;
   END IF;
 
-  SELECT state[2] INTO old_rank;
+  old_rank := state[2];
   IF (state IS NULL) OR
      (rank > old_rank) THEN
     new_state := ARRAY[value::text, rank::text];
