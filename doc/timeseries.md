@@ -36,7 +36,7 @@ CREATE EXTENSION
 
 ## Getting Started
 
-Once you have determined which table needs time-series enhancement, simply call the `enable_ts_table` function with your table name and the name of the column that stores the time for each row:
+Assuming you already have a partitioned table created, simply call the `enable_ts_table` function with your table name.
 
 ```sql
 SELECT enable_ts_table('sensor_readings');
