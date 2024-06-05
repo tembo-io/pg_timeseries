@@ -91,3 +91,11 @@ FROM date_bin_table(NULL::events, '1 minute',
                     '[2020-11-04 15:50:00-08, 2020-11-04 16:00:00-08]')
 GROUP BY 3
 ORDER BY 3;
+
+SELECT last(user_id, value) top_performer,
+       locf(avg(value)) OVER (ORDER BY event_time),
+       event_time
+FROM date_bin_table(NULL::events, '1 minute',
+                    '(2020-11-04 15:50:00-08, 2020-11-04 16:00:00-08)')
+GROUP BY 3
+ORDER BY 3;

@@ -585,12 +585,13 @@ BEGIN
       SELECT %s
       FROM generate_series($2, $3, $1) date_series(date)
       LEFT JOIN data
-      ON data.binned_date = date_series.date;$query$,
+      ON data.binned_date = date_series.date
+      WHERE $4 @> date_series.date;$query$,
     part_col_name,
     target_table_id,
     part_col_name,
     tl_sql)
-  USING time_stride, lower(time_range), upper(time_range);
+  USING time_stride, lower(time_range), upper(time_range), time_range;
   RETURN;
 END;
 $function$;
