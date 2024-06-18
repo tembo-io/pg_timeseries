@@ -238,3 +238,68 @@ ORDER BY 3;
              2 | 1.9000000000000001 | Wed Nov 04 15:59:00 2020 PST
 (9 rows)
 
+CREATE VIEW events_5m AS
+  SELECT
+    user_id,
+    date_bin('5 minutes',
+             event_time,
+             TIMESTAMPTZ '1970-01-01') AS event_time,
+    max(value),
+    min(value)
+    FROM events
+    GROUP BY 1, 2;
+CREATE VIEW events_totals AS
+  SELECT
+    user_id,
+    sum(value),
+    count(user_id)
+  FROM events
+  GROUP BY 1;
+SELECT make_view_incremental('events_5m');
+ make_view_incremental 
+-----------------------
+ 
+(1 row)
+
+SELECT make_view_incremental('events_totals');
+ make_view_incremental 
+-----------------------
+ 
+(1 row)
+
+SELECT * FROM events_5m ORDER BY 1, 2;
+ user_id |          event_time          | max | min 
+---------+------------------------------+-----+-----
+       1 | Wed Nov 04 15:50:00 2020 PST | 1.2 | 1.1
+       1 | Wed Nov 04 15:55:00 2020 PST | 1.6 | 1.3
+       2 | Wed Nov 04 15:50:00 2020 PST | 1.8 | 1.7
+       2 | Wed Nov 04 15:55:00 2020 PST | 2.2 | 1.9
+(4 rows)
+
+SELECT * FROM events_totals ORDER BY 1;
+ user_id | sum  | count 
+---------+------+-------
+       1 |  8.1 |     6
+       2 | 11.7 |     6
+(2 rows)
+
+INSERT INTO events VALUES (3, 1, '2020-11-04 15:51:02.226999-08', 1.1);
+DELETE FROM events WHERE event_id = 12;
+SELECT * FROM events_5m ORDER BY 1, 2;
+ user_id |          event_time          | max | min 
+---------+------------------------------+-----+-----
+       1 | Wed Nov 04 15:50:00 2020 PST | 1.2 | 1.1
+       1 | Wed Nov 04 15:55:00 2020 PST | 1.6 | 1.3
+       2 | Wed Nov 04 15:50:00 2020 PST | 1.8 | 1.7
+       2 | Wed Nov 04 15:55:00 2020 PST | 2.1 | 1.9
+       3 | Wed Nov 04 15:50:00 2020 PST | 1.1 | 1.1
+(5 rows)
+
+SELECT * FROM events_totals ORDER BY 1;
+ user_id | sum | count 
+---------+-----+-------
+       1 | 8.1 |     6
+       2 | 9.5 |     5
+       3 | 1.1 |     1
+(3 rows)
+

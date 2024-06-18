@@ -613,3 +613,80 @@ CREATE AGGREGATE locf(anyelement) (
   SFUNC = locf_agg,
   STYPE = anyelement
 );
+
+-- A wrapper around the incremental view functionality provided by pg_ivm. This
+-- function accepts a pointer to an existing view (presumably one that queries
+-- a time-series table) and rewrites that view to point at an underlying IMMV
+-- instead. The purpose of this is to avoid exposing users to implementation-
+-- specific columns used to track partial aggregate state within IMMV tables:
+-- these columns may confuse users or interfere with software which expects
+-- all visible columns to be meaningful to an application (say, dashboards).
+--
+-- For the record, IMMV means "incrementally maintainable materialized view",
+-- though at the moment these objects are actually plain tables. They are
+-- created by calling functions from the pg_ivm project ("PostgreSQL incre-
+-- mental view maintenance"). After creation, these views automatically keep
+-- aggregates up-to-date with the latest data written to any referenced tables.
+-- This is an improvement over plain views (which reaggregate on every scan)
+-- and materialized views (which require periodic calls to REFRESH).
+--
+-- Within this wrapper, the provided view's SQL is extracted, then a new IMMV
+-- is created using the extracted query. Because this IMMV will have at least
+-- one (sometimes two or more) internal column per aggregate (beginning with
+-- the prefix '__ivm_'), it is desirable to allow the user to query a wrapper
+-- view instead. So the original view's query is redefined to point at the
+-- IMMV table, but restricted solely to the visible columns of the original
+-- query. Big picture: the user can create an aggregating view, check it
+-- quickly (with a LIMIT, for instance), then make it incremental once they
+-- have verified it's producing the aggregate rows they want.
+CREATE OR REPLACE FUNCTION public.make_view_incremental(target_view_id regclass)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  orig_view_sql text;
+  immv_name text;
+  columns_sql text;
+  old_client_msg text;
+  old_log_msg text;
+BEGIN
+  -- check that target_view_id is actually a view
+  -- check that target_view_id mentions only one table
+
+  -- get the original SQL definition of the view to be upgraded
+  SELECT pg_get_viewdef(target_view_id) INTO orig_view_sql;
+
+  -- build the name we'll use for the new immv
+  SELECT format('%I.%I', n.nspname, c.relname || '_immv')
+    INTO immv_name
+    FROM pg_class c
+    LEFT JOIN pg_namespace n
+      ON n.oid = c.relnamespace
+    WHERE c.oid=target_view_id;
+
+  -- pg_ivm is chatty, even at NOTICE, so turn it down
+  SELECT current_setting('client_min_messages') INTO old_client_msg;
+  SELECT current_setting('log_min_messages') INTO old_log_msg;
+  SET LOCAL client_min_messages TO warning;
+  SET LOCAL log_min_messages TO warning;
+
+  -- create an immv with the original view's SQL
+  PERFORM create_immv(immv_name, orig_view_sql);
+
+  -- restore previous client/log levels
+  EXECUTE format('SET LOCAL client_min_messages TO %s', old_client_msg);
+  EXECUTE format('SET LOCAL log_min_messages TO %s', old_log_msg);
+
+  -- build a list of visible columns for the view
+  SELECT string_agg(quote_ident(attname), ', ' ORDER BY attnum ASC)
+    INTO columns_sql
+    FROM pg_attribute
+    WHERE attnum > 0 AND
+          NOT attisdropped AND
+          attrelid=target_view_id;
+
+  -- modify the existing view to point at the immv, hiding internal columns
+  EXECUTE format('CREATE OR REPLACE VIEW %I AS SELECT %s FROM %s',
+                 target_view_id, columns_sql, immv_name);
+END;
+$function$;
