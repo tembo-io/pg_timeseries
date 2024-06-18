@@ -23,6 +23,7 @@
       "recommends": {
         "columnar": "1.1.2",
         "pg_cron": "1.6.2",
+        "pg_ivm": "1.8",
         "pg_partman": "4.5.1"
       }
     }
