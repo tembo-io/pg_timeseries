@@ -668,3 +668,48 @@ BEGIN
 END;
 $function$;
 
+-- This function will call tier function for the qualified partitions 
+-- (which must be time-series enabled) and a compression offset, all partitions falling
+-- entirely behind the offset (from the present time). 
+CREATE OR REPLACE FUNCTION @extschema@.apply_tier_policy(target_table_id regclass, comp_offset interval)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+table_name text;
+part_row record;
+part_beg timestamptz;
+part_end timestamptz;
+part_am name;
+BEGIN
+  IF comp_offset IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT format('%s.%s', n.nspname, c.relname)
+  INTO table_name
+  FROM pg_class c
+  LEFT JOIN pg_namespace n
+    ON n.oid = c.relnamespace
+  WHERE c.oid=target_table_id;
+
+  FOR part_row IN
+    SELECT
+      partition_schemaname,
+      partition_tablename
+    FROM @extschema@.show_partitions(table_name, 'ASC')
+    LOOP
+      SELECT child_start_time, child_end_time
+        INTO part_beg, part_end
+        FROM @extschema@.show_partition_info(
+          part_row.partition_schemaname || '.' ||
+          part_row.partition_tablename);
+
+      IF part_end < (now() - comp_offset) THEN
+      EXECUTE SELECT tier.table(target_table_id); 
+    END IF;
+  END LOOP;
+END;
+$function$;
+
+
