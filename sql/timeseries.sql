@@ -11,7 +11,8 @@ CREATE TABLE @extschema@.ts_config(
   compression_duration interval,
   CONSTRAINT policy_duration_order_check 
   CHECK(compression_duration < tier_duration 
-	AND tier_duration < retention_duration));
+	AND tier_duration < retention_duration
+        AND compression_duration < retention_duration));
 
 -- Enhances an existing table with our time-series best practices. Basically
 -- the entry point to this extension. Minimally, a user must create a table
@@ -706,7 +707,9 @@ BEGIN
           part_row.partition_tablename);
 
       IF part_end < (now() - comp_offset) THEN
-      EXECUTE SELECT tier.table(target_table_id); 
+	EXECUTE 'SELECT tier.table(' || 
+		                   chr(39)|| part_row.partition_schemaname || '.' || part_row.partition_tablename || 
+				   chr(39)|| ')';
     END IF;
   END LOOP;
 END;
