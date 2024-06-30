@@ -77,6 +77,21 @@ Sometimes you know older data isn't queried very often, but still don't want to 
 
 By calling `set_ts_compression_policy` on a time-series table with an appropriate interval (perhaps`'1 month'`), this extension will take care of compressing partitions (using a columnar storage method) older than the specified interval, once an hour. As with the retention policy functionality, a function is also provided for clearing any existing policy (existing partitions will not be decompressed, however).
 
+### Object Store Tier
+
+Integration with pg_tier enables extended data retention and low cost data retrieval as compare to traditional archival and retrieval solutions. If partition is aged enough to be ignored from mainstream queries, then it can be tiered to AWS S3 object store. DML queries, Analytical queries and Backfilling INSERT or UPDATE is supported on the tiered partition.
+
+**Setting up AWS S3 bucket and credential**.
+
+```sql
+select tier.set_tier_config('my-storage-bucket','AWS_ACCESS_KEY', 'AWS_SECRET_KEY','AWS_REGION');
+```
+**Tier policy creation**
+
+```sql
+select set_ts_tier_policy('TIMESERIES_TABLE', 'DURATION_IN_INTERVAL');
+```
+
 ### Analytics Helpers
 
 This extension includes several functions intended to make writing correct time-series queries easier. Certain concepts can be difficult to express in standard SQL and helper functions can aid in readability and maintainability.

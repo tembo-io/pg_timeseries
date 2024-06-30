@@ -9,8 +9,8 @@ CREATE TABLE @extschema@.ts_config(
   retention_duration interval,
   tier_duration interval,
   compression_duration interval,
-  CONSTRAINT policy_duration_order_check 
-  CHECK(compression_duration < tier_duration 
+  CONSTRAINT policy_duration_order_check
+  CHECK(compression_duration < tier_duration
 	AND tier_duration < retention_duration
         AND compression_duration < retention_duration));
 
@@ -669,9 +669,9 @@ BEGIN
 END;
 $function$;
 
--- This function will call tier function for the qualified partitions 
+-- This function will call tier function for the qualified partitions
 -- (which must be time-series enabled) and a compression offset, all partitions falling
--- entirely behind the offset (from the present time). 
+-- entirely behind the offset (from the present time).
 CREATE OR REPLACE FUNCTION @extschema@.apply_tier_policy(target_table_id regclass, comp_offset interval)
  RETURNS void
  LANGUAGE plpgsql
@@ -707,12 +707,13 @@ BEGIN
           part_row.partition_tablename);
 
       IF part_end < (now() - comp_offset) THEN
-	EXECUTE 'SELECT tier.table(' || 
-		                   chr(39)|| part_row.partition_schemaname || '.' || part_row.partition_tablename || 
+	EXECUTE 'SELECT tier.table(' ||
+		                   chr(39)|| part_row.partition_schemaname || '.' || part_row.partition_tablename ||
 				   chr(39)|| ')';
     END IF;
   END LOOP;
 END;
 $function$;
 
-
+--Tier data every fortnight (15 days).
+SELECT cron.schedule('timeseries-tiering', '0 23 15 * *', $$SELECT @extschema@.apply_tier_policy(table_id, tier_duration) FROM ts_config;$$);
