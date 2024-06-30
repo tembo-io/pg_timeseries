@@ -7,7 +7,12 @@ CREATE TABLE @extschema@.ts_config(
   partition_duration interval NOT NULL,
   partition_lead_time interval NOT NULL,
   retention_duration interval,
-  compression_duration interval);
+  tier_duration interval,
+  compression_duration interval,
+  CONSTRAINT policy_duration_order_check
+  CHECK(compression_duration < tier_duration
+	AND tier_duration < retention_duration
+        AND compression_duration < retention_duration));
 
 -- Enhances an existing table with our time-series best practices. Basically
 -- the entry point to this extension. Minimally, a user must create a table
@@ -613,3 +618,102 @@ CREATE AGGREGATE locf(anyelement) (
   SFUNC = locf_agg,
   STYPE = anyelement
 );
+
+-- This function sets a tier to object store policy on an existing time-series table, which
+-- ensures that all partitions older than a particular offset (from present) are
+-- automatically moved to a S3 storage.
+--
+-- Returns the previous tier duration, or NULL if none was set.
+CREATE OR REPLACE FUNCTION @extschema@.set_ts_tier_policy(target_table_id regclass, new_tier interval)
+ RETURNS interval
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  table_name text;
+  prev_tier interval;
+BEGIN
+  SELECT tier_duration
+    INTO prev_tier
+    FROM @extschema@.ts_config
+    WHERE "table_id"=target_table_id
+    FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE object_not_in_prerequisite_state USING
+      MESSAGE = 'could not fetch tier policy',
+      DETAIL  = 'Target table was not time-series enhanced',
+      HINT    = format('Call %L to enable time-series enhancements', 'enable_ts_table');
+  END IF;
+
+  UPDATE @extschema@.ts_config
+    SET "tier_duration"=new_tier
+    WHERE "table_id"=target_table_id;
+
+  RETURN prev_tier;
+END;
+$function$;
+
+
+-- Unsets any tier policy on the specified table. Returns the old policy,
+-- if one was set.
+CREATE OR REPLACE
+FUNCTION @extschema@.clear_ts_tier_policy(target_table_id regclass)
+  RETURNS interval
+  LANGUAGE plpgsql
+AS $function$
+DECLARE
+  prev_tier interval;
+BEGIN
+  SELECT set_ts_tier_policy(target_table_id, NULL) INTO prev_tier;
+
+  RETURN prev_tier;
+END;
+$function$;
+
+-- This function will call tier function for the qualified partitions
+-- (which must be time-series enabled) and a compression offset, all partitions falling
+-- entirely behind the offset (from the present time).
+CREATE OR REPLACE FUNCTION @extschema@.apply_tier_policy(target_table_id regclass, comp_offset interval)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+table_name text;
+part_row record;
+part_beg timestamptz;
+part_end timestamptz;
+part_am name;
+BEGIN
+  IF comp_offset IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT format('%s.%s', n.nspname, c.relname)
+  INTO table_name
+  FROM pg_class c
+  LEFT JOIN pg_namespace n
+    ON n.oid = c.relnamespace
+  WHERE c.oid=target_table_id;
+
+  FOR part_row IN
+    SELECT
+      partition_schemaname,
+      partition_tablename
+    FROM @extschema@.show_partitions(table_name, 'ASC')
+    LOOP
+      SELECT child_start_time, child_end_time
+        INTO part_beg, part_end
+        FROM @extschema@.show_partition_info(
+          part_row.partition_schemaname || '.' ||
+          part_row.partition_tablename);
+
+      IF part_end < (now() - comp_offset) THEN
+	EXECUTE 'SELECT tier.table(' ||
+		                   chr(39)|| part_row.partition_schemaname || '.' || part_row.partition_tablename ||
+				   chr(39)|| ')';
+    END IF;
+  END LOOP;
+END;
+$function$;
+
+--Tier data every fortnight (15 days).
+SELECT cron.schedule('timeseries-tiering', '0 23 15 * *', $$SELECT @extschema@.apply_tier_policy(table_id, tier_duration) FROM ts_config;$$);

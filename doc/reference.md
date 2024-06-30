@@ -132,6 +132,34 @@ Clears the compression policy for a table (so its data will never be dropped).
 
 `interval`, the previous policy for this table, or `NULL` if none was set.
 
+## Object Store Tier (AWS S3)
+
+### `set_ts_tier_policy`
+
+Sets the tier policy for a time-series table. Lazily applied every fortnightly.
+
+#### Arguments
+
+  * `target_table_id` (`regclass`), **required** — the time-series enhanced table whose tier schedule is to be modified
+  * `new_compression` (`interval`), **required** — the new tier duration for the time-series table
+
+#### Returns
+
+`interval`, the previous policy for this table, or `NULL` if none was set.
+
+### `clear_ts_tier_policy`
+
+Clears the tier policy for a table.
+
+#### Arguments
+
+  * `target_table_id` (`regclass`), **required** — the time-series enhanced table whose tier schedule is to be cleared
+
+#### Returns
+
+`interval`, the previous policy for this table, or `NULL` if none was set.
+
+
 ## Analytics Functions
 
 These functions are not related to the maintenance of time-series tables, but do sometimes rely on the related metadata to function. They are intended to make time-series queries easier to read and maintain.
