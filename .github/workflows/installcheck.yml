@@ -51,6 +51,8 @@ jobs:
           sudo ~/.cargo/bin/trunk install --pg-version=${{matrix.pg_version}} pg_partman
           sudo ~/.cargo/bin/trunk install --pg-version=${{matrix.pg_version}} pg_cron
           sudo ~/.cargo/bin/trunk install --pg-version=${{matrix.pg_version}} hydra_columnar
+          sudo ~/.cargo/bin/trunk install --pg-version=${{matrix.pg_version}} parquet_s3_fdw
+          sudo ~/.cargo/bin/trunk install --pg-version=${{matrix.pg_version}} pg_tier
 
       - uses: actions/checkout@v3
 
