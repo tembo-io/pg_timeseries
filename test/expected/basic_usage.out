@@ -3,6 +3,8 @@ CREATE EXTENSION timeseries CASCADE;
 NOTICE:  installing required extension "columnar"
 NOTICE:  installing required extension "pg_cron"
 NOTICE:  installing required extension "pg_partman"
+NOTICE:  installing required extension "pg_tier"
+NOTICE:  installing required extension "parquet_s3_fdw"
 CREATE TABLE simple ();
 SELECT enable_ts_table('simple');
 ERROR:  could not enable time-series enhancements
@@ -237,4 +239,223 @@ ORDER BY 3;
              2 |                1.8 | Wed Nov 04 15:58:00 2020 PST
              2 | 1.9000000000000001 | Wed Nov 04 15:59:00 2020 PST
 (9 rows)
+
+create table sensor_data(
+sensor_id integer not null,
+time timestamptz not null,
+cpu double precision null,
+temperature double precision null
+) PARTITION BY RANGE (time);
+SELECT enable_ts_table('sensor_data');
+ enable_ts_table 
+-----------------
+ 
+(1 row)
+
+--Set and Verify tier policy
+SELECT set_ts_tier_policy('sensor_data', '180 days');
+ set_ts_tier_policy 
+--------------------
+ 
+(1 row)
+
+SELECT tier_duration FROM ts_config WHERE table_id='sensor_data'::regclass;
+ tier_duration 
+---------------
+ @ 180 days
+(1 row)
+
+--Clear and Verify tier policy
+SELECT clear_ts_tier_policy('sensor_data');
+ clear_ts_tier_policy 
+----------------------
+ @ 180 days
+(1 row)
+
+SELECT tier_duration FROM ts_config WHERE table_id='sensor_data'::regclass;
+ tier_duration 
+---------------
+ 
+(1 row)
+
+--Check compatibility when retention < tier
+SELECT set_ts_retention_policy('sensor_data', '90 days');
+ set_ts_retention_policy 
+-------------------------
+ 
+(1 row)
+
+SELECT set_ts_tier_policy('sensor_data', '180 days');
+ERROR:  new row for relation "ts_config" violates check constraint "policy_duration_order_check"
+DETAIL:  Failing row contains (sensor_data, @ 7 days, @ 1 mon, @ 90 days, @ 180 days, null).
+SELECT clear_ts_retention_policy('sensor_data');
+ clear_ts_retention_policy 
+---------------------------
+ @ 90 days
+(1 row)
+
+--Check compatibility when compression > tier
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+ set_ts_compression_policy 
+---------------------------
+ 
+(1 row)
+
+SELECT set_ts_tier_policy('sensor_data', '60 days');
+ERROR:  new row for relation "ts_config" violates check constraint "policy_duration_order_check"
+DETAIL:  Failing row contains (sensor_data, @ 7 days, @ 1 mon, null, @ 60 days, @ 90 days).
+SELECT clear_ts_compression_policy('sensor_data');
+ clear_ts_compression_policy 
+-----------------------------
+ @ 90 days
+(1 row)
+
+SELECT clear_ts_tier_policy('sensor_data');
+ clear_ts_tier_policy 
+----------------------
+ 
+(1 row)
+
+--Check compatibility when compression < tier
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+ set_ts_compression_policy 
+---------------------------
+ 
+(1 row)
+
+SELECT set_ts_tier_policy('sensor_data', '180 days');
+ set_ts_tier_policy 
+--------------------
+ 
+(1 row)
+
+SELECT clear_ts_compression_policy('sensor_data');
+ clear_ts_compression_policy 
+-----------------------------
+ @ 90 days
+(1 row)
+
+SELECT clear_ts_tier_policy('sensor_data');
+ clear_ts_tier_policy 
+----------------------
+ @ 180 days
+(1 row)
+
+--Check compatibility when compression < retention
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+ set_ts_compression_policy 
+---------------------------
+ 
+(1 row)
+
+SELECT set_ts_retention_policy('sensor_data', '180 days');
+ set_ts_retention_policy 
+-------------------------
+ 
+(1 row)
+
+SELECT clear_ts_compression_policy('sensor_data');
+ clear_ts_compression_policy 
+-----------------------------
+ @ 90 days
+(1 row)
+
+SELECT clear_ts_retention_policy('sensor_data');
+ clear_ts_retention_policy 
+---------------------------
+ @ 180 days
+(1 row)
+
+--Check compatibility when compression > retention
+SELECT set_ts_compression_policy('sensor_data', '180 days');
+ set_ts_compression_policy 
+---------------------------
+ 
+(1 row)
+
+SELECT set_ts_retention_policy('sensor_data', '90 days');
+ERROR:  new row for relation "ts_config" violates check constraint "policy_duration_order_check"
+DETAIL:  Failing row contains (sensor_data, @ 7 days, @ 1 mon, @ 90 days, null, @ 180 days).
+SELECT clear_ts_compression_policy('sensor_data');
+ clear_ts_compression_policy 
+-----------------------------
+ @ 180 days
+(1 row)
+
+SELECT clear_ts_retention_policy('sensor_data');
+ clear_ts_retention_policy 
+---------------------------
+ 
+(1 row)
+
+--Check compatibility when compression < retention < tier
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+ set_ts_compression_policy 
+---------------------------
+ 
+(1 row)
+
+SELECT set_ts_retention_policy('sensor_data', '180 days');
+ set_ts_retention_policy 
+-------------------------
+ 
+(1 row)
+
+SELECT set_ts_tier_policy('sensor_data', '270 days');
+ERROR:  new row for relation "ts_config" violates check constraint "policy_duration_order_check"
+DETAIL:  Failing row contains (sensor_data, @ 7 days, @ 1 mon, @ 180 days, @ 270 days, @ 90 days).
+SELECT clear_ts_compression_policy('sensor_data');
+ clear_ts_compression_policy 
+-----------------------------
+ @ 90 days
+(1 row)
+
+SELECT clear_ts_retention_policy('sensor_data');
+ clear_ts_retention_policy 
+---------------------------
+ @ 180 days
+(1 row)
+
+SELECT clear_ts_tier_policy('sensor_data');
+ clear_ts_tier_policy 
+----------------------
+ 
+(1 row)
+
+--Check compatibility when compression < tier < retention
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+ set_ts_compression_policy 
+---------------------------
+ 
+(1 row)
+
+SELECT set_ts_tier_policy('sensor_data', '180 days');
+ set_ts_tier_policy 
+--------------------
+ 
+(1 row)
+
+SELECT set_ts_retention_policy('sensor_data', '270 days');
+ set_ts_retention_policy 
+-------------------------
+ 
+(1 row)
+
+SELECT clear_ts_compression_policy('sensor_data');
+ clear_ts_compression_policy 
+-----------------------------
+ @ 90 days
+(1 row)
+
+SELECT clear_ts_retention_policy('sensor_data');
+ clear_ts_retention_policy 
+---------------------------
+ @ 270 days
+(1 row)
+
+SELECT clear_ts_tier_policy('sensor_data');
+ clear_ts_tier_policy 
+----------------------
+ @ 180 days
+(1 row)
 
