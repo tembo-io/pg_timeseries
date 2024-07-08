@@ -715,5 +715,5 @@ BEGIN
 END;
 $function$;
 
---Tier data every fortnight (15 days).
-SELECT cron.schedule('timeseries-tiering', '0 23 15 * *', $$SELECT @extschema@.apply_tier_policy(table_id, tier_duration) FROM ts_config;$$);
+--Tier data every Sunday starts at 3 AM.
+SELECT cron.schedule('timeseries-tiering', '0 3 * * 0', $$SELECT @extschema@.apply_tier_policy(table_id, tier_duration) FROM ts_config;$$);
