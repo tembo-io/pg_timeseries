@@ -110,7 +110,15 @@ The output of this query will differ from simply hitting the target table direct
   * The time column's values will be binned to the provided width
   * Extra rows will be added for periods with no data. They will include the time stamp for that bin and NULL in all other columns
 
+## Requirements
 
+As seen in the Docker installation demonstration, the `pg_timeseries` extension depends on three other extensions:
+
+* [Hydra Columnar](https://github.com/hydradatabase/hydra)
+* [pg_cron](https://github.com/citusdata/pg_cron)
+* [pg_partman](https://github.com/pgpartman/pg_partman)
+
+We recommend referring to documentation within these projects for more advanced use cases, or for a better understanding at how this extension works.
 
 ## Roadmap
 
