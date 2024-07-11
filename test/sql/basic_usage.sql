@@ -99,3 +99,66 @@ FROM date_bin_table(NULL::events, '1 minute',
                     '(2020-11-04 15:50:00-08, 2020-11-04 16:00:00-08)')
 GROUP BY 3
 ORDER BY 3;
+
+create table sensor_data(
+sensor_id integer not null,
+time timestamptz not null,
+cpu double precision null,
+temperature double precision null
+) PARTITION BY RANGE (time);
+
+SELECT enable_ts_table('sensor_data');
+
+--Set and Verify tier policy
+SELECT set_ts_tier_policy('sensor_data', '180 days');
+SELECT tier_duration FROM ts_config WHERE table_id='sensor_data'::regclass;
+
+--Clear and Verify tier policy
+SELECT clear_ts_tier_policy('sensor_data');
+SELECT tier_duration FROM ts_config WHERE table_id='sensor_data'::regclass;
+
+--Check compatibility when retention < tier
+SELECT set_ts_retention_policy('sensor_data', '90 days');
+SELECT set_ts_tier_policy('sensor_data', '180 days');
+SELECT clear_ts_retention_policy('sensor_data');
+
+--Check compatibility when compression > tier
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+SELECT set_ts_tier_policy('sensor_data', '60 days');
+SELECT clear_ts_compression_policy('sensor_data');
+SELECT clear_ts_tier_policy('sensor_data');
+
+--Check compatibility when compression < tier
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+SELECT set_ts_tier_policy('sensor_data', '180 days');
+SELECT clear_ts_compression_policy('sensor_data');
+SELECT clear_ts_tier_policy('sensor_data');
+
+--Check compatibility when compression < retention
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+SELECT set_ts_retention_policy('sensor_data', '180 days');
+SELECT clear_ts_compression_policy('sensor_data');
+SELECT clear_ts_retention_policy('sensor_data');
+
+--Check compatibility when compression > retention
+SELECT set_ts_compression_policy('sensor_data', '180 days');
+SELECT set_ts_retention_policy('sensor_data', '90 days');
+SELECT clear_ts_compression_policy('sensor_data');
+SELECT clear_ts_retention_policy('sensor_data');
+
+--Check compatibility when compression < retention < tier
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+SELECT set_ts_retention_policy('sensor_data', '180 days');
+SELECT set_ts_tier_policy('sensor_data', '270 days');
+SELECT clear_ts_compression_policy('sensor_data');
+SELECT clear_ts_retention_policy('sensor_data');
+SELECT clear_ts_tier_policy('sensor_data');
+
+--Check compatibility when compression < tier < retention
+SELECT set_ts_compression_policy('sensor_data', '90 days');
+SELECT set_ts_tier_policy('sensor_data', '180 days');
+SELECT set_ts_retention_policy('sensor_data', '270 days');
+SELECT clear_ts_compression_policy('sensor_data');
+SELECT clear_ts_retention_policy('sensor_data');
+SELECT clear_ts_tier_policy('sensor_data');
+
