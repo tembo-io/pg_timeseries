@@ -682,6 +682,7 @@ part_row record;
 part_beg timestamptz;
 part_end timestamptz;
 part_am name;
+rkind char;
 BEGIN
   IF comp_offset IS NULL THEN
     RETURN;
@@ -706,10 +707,12 @@ BEGIN
           part_row.partition_schemaname || '.' ||
           part_row.partition_tablename);
 
-      IF part_end < (now() - comp_offset) THEN
-	EXECUTE 'SELECT tier.table(' ||
-		                   chr(39)|| part_row.partition_schemaname || '.' || part_row.partition_tablename ||
-				   chr(39)|| ')';
+      SELECT relkind INTO rkind FROM pg_class
+        WHERE relname = part_row.partition_tablename
+        AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = part_row.partition_schemaname LIMIT 1);
+
+      IF rkind <> 'f' AND part_end < (now() - comp_offset) THEN
+	      EXECUTE 'SELECT tier.table(' || chr(39) || part_row.partition_schemaname || '.' || part_row.partition_tablename || chr(39) || ')';
     END IF;
   END LOOP;
 END;
