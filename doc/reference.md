@@ -132,6 +132,30 @@ Clears the compression policy for a table (so its data will never be dropped).
 
 `interval`, the previous policy for this table, or `NULL` if none was set.
 
+## Incremental Views
+
+These functions deal with the creation and maintenance of incremental views, or more verbosely, _incrementally maintainable materialized views_ (IMMVs). The underlying functionality is provided the the `pg_ivm` ("PostgreSQL Incremental View Maintenance") project, which handles applying changes toward any partial aggregates and groups which are affected by incoming `INSERT`, `UPDATE`, `DELETE`, etc. (DML) statements.
+
+Within `pg_timeseries`, it is expected that these functions be applied against existing time-series enhanced tables.
+
+### `make_view_incremental`
+
+This function takes an existing view—typically used to calculate aggregates across a time-series data set—and makes it into an incremental view: one whose aggregates are stored in a materialized fashion, but which is kept up-to-date as every individual modification to the underlying table is processed.
+
+After this function exits, the same view will exist, but will now point at an _incrementally maintainable materialized view_. This view maintains its correctness through a series of statement triggers on the time-series table, meaning that for maximum performance, some degree of row batching should be used for ingest.
+
+#### Arguments
+
+  * `target_view_id` (`regclass`), **required** — a view aggregating a single existing time-series table
+
+#### Considerations
+
+Views which reference more than one table are presently forbidden, though this restriction may be lifted at a later date.
+
+#### Returns
+
+`void`. If any problems are encountered, an error will be raised.
+
 ## Analytics Functions
 
 These functions are not related to the maintenance of time-series tables, but do sometimes rely on the related metadata to function. They are intended to make time-series queries easier to read and maintain.

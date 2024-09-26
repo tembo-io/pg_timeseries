@@ -99,3 +99,34 @@ FROM date_bin_table(NULL::events, '1 minute',
                     '(2020-11-04 15:50:00-08, 2020-11-04 16:00:00-08)')
 GROUP BY 3
 ORDER BY 3;
+
+CREATE VIEW events_5m AS
+  SELECT
+    user_id,
+    date_bin('5 minutes',
+             event_time,
+             TIMESTAMPTZ '1970-01-01') AS event_time,
+    max(value),
+    min(value)
+    FROM events
+    GROUP BY 1, 2;
+
+CREATE VIEW events_totals AS
+  SELECT
+    user_id,
+    sum(value),
+    count(user_id)
+  FROM events
+  GROUP BY 1;
+
+SELECT make_view_incremental('events_5m');
+SELECT make_view_incremental('events_totals');
+
+SELECT * FROM events_5m ORDER BY 1, 2;
+SELECT * FROM events_totals ORDER BY 1;
+
+INSERT INTO events VALUES (3, 1, '2020-11-04 15:51:02.226999-08', 1.1);
+DELETE FROM events WHERE event_id = 12;
+
+SELECT * FROM events_5m ORDER BY 1, 2;
+SELECT * FROM events_totals ORDER BY 1;
