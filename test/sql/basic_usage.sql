@@ -1,14 +1,7 @@
-\set SHOW_CONTEXT always
-\set VERBOSITY verbose
+\set SHOW_CONTEXT never
 
--- why aren't tests building
-
-CREATE EXTENSION columnar;
-CREATE EXTENSION pg_cron;
-CREATE EXTENSION pg_ivm;
-CREATE EXTENSION pg_partman;
-
-CREATE EXTENSION timeseries;
+CREATE EXTENSION timeseries CASCADE;
+\errverbose
 
 CREATE TABLE simple ();
 SELECT enable_ts_table('simple');
