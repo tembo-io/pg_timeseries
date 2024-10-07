@@ -1,4 +1,4 @@
-FROM postgres:16.3 as builder
+FROM postgres:16 AS builder
 
 RUN apt-get update \
     && apt-get install -y \
@@ -25,18 +25,24 @@ RUN git clone https://github.com/pgpartman/pg_partman.git && \
     make && make install && \
     cd .. && rm -rf pg_partman
 
+RUN git clone https://github.com/tembo-io/pg_ivm.git && \
+	cd pg_ivm && \
+	make && make install && \
+	cd .. && rm -rf pg_ivm
+
 RUN apt install -y libcurl4-openssl-dev liblz4-dev libzstd-dev autoconf
 
 RUN git clone https://github.com/hydradatabase/hydra && \
     cd hydra/columnar &&  \
     ./configure && \
-    make && make install
+    make && make install && \
+	cd ../.. && rm -rf hydra
 
 # build and install timeseries
 COPY . .
 RUN make && make install || true
 
-FROM postgres:16.3-bookworm
+FROM postgres:16-bookworm
 COPY --from=builder /usr/share/postgresql/16/extension /usr/share/postgresql/16/extension
 COPY --from=builder /usr/lib/postgresql/16/lib /usr/lib/postgresql/16/lib
 
