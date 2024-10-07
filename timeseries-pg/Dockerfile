@@ -35,7 +35,8 @@ RUN apt install -y libcurl4-openssl-dev liblz4-dev libzstd-dev autoconf
 RUN git clone https://github.com/hydradatabase/hydra && \
     cd hydra/columnar &&  \
     ./configure && \
-    make && make install
+    make && make install && \
+	cd ../.. && rm -rf hydra
 
 # build and install timeseries
 COPY . .
