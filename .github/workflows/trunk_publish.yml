@@ -6,16 +6,9 @@ defaults:
     working-directory: ./
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths-ignore:
-      - "README.md"
   push:
-    branches:
-      - main
-    paths-ignore:
-      - "README.md"
+    # Release on semantic version tag.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
 
   release:
     types:
