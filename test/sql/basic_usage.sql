@@ -1,5 +1,10 @@
 \set SHOW_CONTEXT never
 
+-- CREATE EXTENSION pg_cron;
+CREATE EXTENSION pg_ivm;
+-- CREATE EXTENSION columnar;
+-- CREATE EXTENSION pg_partman;
+
 CREATE EXTENSION timeseries CASCADE;
 \errverbose
 
