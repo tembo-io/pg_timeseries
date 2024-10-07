@@ -95,6 +95,7 @@ jobs:
           tags: |
             quay.io/tembo/timeseries-pg:v${{ steps.versions.outputs.SHORT_SHA }}
             quay.io/tembo/timeseries-pg:latest
+            quay.io/tembo/timeseries-pg:v0.1.6
 
       - name: Build and push
         # publish latest and TAG for releases
