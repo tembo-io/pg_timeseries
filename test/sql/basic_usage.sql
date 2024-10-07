@@ -1,6 +1,12 @@
-\set SHOW_CONTEXT never
+\set SHOW_CONTEXT always
+\set VERBOSITY verbose
 
-CREATE EXTENSION timeseries CASCADE;
+CREATE EXTENSION columnar;
+CREATE EXTENSION pg_cron;
+CREATE EXTENSION pg_ivm;
+CREATE EXTENSION pg_partman;
+
+CREATE EXTENSION timeseries;
 
 CREATE TABLE simple ();
 SELECT enable_ts_table('simple');
