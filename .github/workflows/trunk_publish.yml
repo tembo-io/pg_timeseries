@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        pg-version: [14, 15, 16]
+        pg-version: [15]
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain
