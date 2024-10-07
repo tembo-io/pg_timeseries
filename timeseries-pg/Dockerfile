@@ -1,4 +1,4 @@
-FROM postgres:16.3 as builder
+FROM postgres:17 as builder
 
 RUN apt-get update \
     && apt-get install -y \
@@ -10,7 +10,7 @@ RUN apt-get update \
 	libssl-dev \
 	make \
 	pkg-config \
-	postgresql-server-dev-16
+	postgresql-server-dev-17
 
 WORKDIR /timeseries
 
@@ -41,7 +41,7 @@ RUN git clone https://github.com/hydradatabase/hydra && \
 COPY . .
 RUN make && make install || true
 
-FROM postgres:16.3-bookworm
+FROM postgres:17-bookworm
 COPY --from=builder /usr/share/postgresql/16/extension /usr/share/postgresql/16/extension
 COPY --from=builder /usr/lib/postgresql/16/lib /usr/lib/postgresql/16/lib
 
