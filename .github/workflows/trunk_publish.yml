@@ -94,10 +94,11 @@ jobs:
           push: true
           tags: |
             quay.io/tembo/timeseries-pg:v${{ steps.versions.outputs.SHORT_SHA }}
+            quay.io/tembo/timeseries-pg:latest
 
       - name: Build and push
         # publish latest and TAG for releases
-        # if: github.event_name == 'release'
+        if: github.event_name == 'release'
         uses: docker/build-push-action@v5
         with:
           file: ./timeseries-pg/Dockerfile
@@ -105,4 +106,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
+            quay.io/tembo/timeseries-pg:v${{ steps.versions.outputs.TAG_VER }}
             quay.io/tembo/timeseries-pg:latest
