@@ -25,6 +25,11 @@ RUN git clone https://github.com/pgpartman/pg_partman.git && \
     make && make install && \
     cd .. && rm -rf pg_partman
 
+RUN git clone https://github.com/tembo-io/pg_ivm.git && \
+	cd pg_ivm && \
+    make && make install && \
+	cd .. && rm -rf pg_ivm
+
 RUN apt install -y libcurl4-openssl-dev liblz4-dev libzstd-dev autoconf
 
 RUN git clone https://github.com/hydradatabase/hydra && \
