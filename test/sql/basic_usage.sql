@@ -1,6 +1,8 @@
 \set SHOW_CONTEXT always
 \set VERBOSITY verbose
 
+-- why aren't tests building
+
 CREATE EXTENSION columnar;
 CREATE EXTENSION pg_cron;
 CREATE EXTENSION pg_ivm;
