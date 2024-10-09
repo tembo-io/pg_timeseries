@@ -2,7 +2,8 @@ name: PostgreSQL Installcheck
 
 on:
   pull_request:
-    types: [opened, edited, reopened, review_requested]
+    branches:
+      - main
 
 jobs:
   installcheck:
