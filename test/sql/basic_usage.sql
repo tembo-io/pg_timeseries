@@ -1,5 +1,7 @@
 \set SHOW_CONTEXT never
 
+CREATE EXTENSION pg_ivm;
+
 CREATE EXTENSION timeseries CASCADE;
 
 CREATE TABLE simple ();

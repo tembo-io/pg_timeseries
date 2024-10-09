@@ -1,8 +1,8 @@
 \set SHOW_CONTEXT never
+CREATE EXTENSION pg_ivm;
 CREATE EXTENSION timeseries CASCADE;
 NOTICE:  installing required extension "columnar"
 NOTICE:  installing required extension "pg_cron"
-NOTICE:  installing required extension "pg_ivm"
 NOTICE:  installing required extension "pg_partman"
 CREATE TABLE simple ();
 SELECT enable_ts_table('simple');
