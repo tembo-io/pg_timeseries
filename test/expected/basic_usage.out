@@ -1,9 +1,9 @@
 \set SHOW_CONTEXT never
 CREATE EXTENSION pg_ivm;
-CREATE EXTENSION timeseries CASCADE;
-NOTICE:  installing required extension "columnar"
-NOTICE:  installing required extension "pg_cron"
-NOTICE:  installing required extension "pg_partman"
+CREATE EXTENSION pg_partman;
+CREATE EXTENSION columnar;
+CREATE EXTENSION pg_cron;
+CREATE EXTENSION timeseries;
 CREATE TABLE simple ();
 SELECT enable_ts_table('simple');
 ERROR:  could not enable time-series enhancements
