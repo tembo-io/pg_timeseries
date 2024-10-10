@@ -1,6 +1,11 @@
 \set SHOW_CONTEXT never
 
-CREATE EXTENSION timeseries CASCADE;
+CREATE EXTENSION pg_ivm;
+CREATE EXTENSION pg_partman;
+CREATE EXTENSION columnar;
+CREATE EXTENSION pg_cron;
+
+CREATE EXTENSION timeseries;
 
 CREATE TABLE simple ();
 SELECT enable_ts_table('simple');

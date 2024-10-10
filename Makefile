@@ -32,3 +32,29 @@ latest-changes.md: Changes
 # previous upgrade scripts
 sql/$(EXTENSION)--0.1.6.sql: sql/$(EXTENSION).sql
 	cat $^ > $@
+
+install-tembo-ivm:
+	git clone https://github.com/tembo-io/pg_ivm.git && \
+	cd pg_ivm && \
+    make && make install && \
+	cd .. && rm -rf pg_ivm
+
+install-pg-partman:
+	git clone https://github.com/pgpartman/pg_partman.git && \
+    cd pg_partman && \
+    make && make install && \
+    cd .. && rm -rf pg_partman
+
+install-pg-cron:
+	git clone https://github.com/citusdata/pg_cron.git && \
+	cd pg_cron && \
+	make && make install && \
+    cd .. && rm -rf pg_cron
+
+install-hydra:
+	git clone https://github.com/hydradatabase/hydra && \
+    cd hydra/columnar &&  \
+    ./configure && \
+    make && make install
+
+install-dependencies: install-tembo-ivm install-pg-partman install-pg-cron install-hydra
