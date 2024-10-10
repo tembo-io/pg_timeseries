@@ -31,7 +31,6 @@ RUN git clone https://github.com/pgpartman/pg_partman.git && \
 
 RUN git clone https://github.com/hydradatabase/hydra && \
     cd hydra/columnar &&  \
-    ./configure && \
     make && make install && \
 	cd ../.. && rm -rf hydra
 
