@@ -53,13 +53,17 @@ jobs:
     outputs:
       short_sha: ${{ steps.versions.outputs.SHORT_SHA }}
     steps:
+      - name: Install Dependecies
+        shell: bash
+        run: |
+          set -xe
+          sudo apt-get update && sudo apt-get install -y build-essentials ninja-build libpixman-1-dev make wget
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install stoml
         shell: bash
         run: |
          set -xe
-         sudo apt-get update && sudo apt-get install -y wget
          wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
          mv stoml_linux_amd64 stoml
          chmod +x stoml
@@ -71,6 +75,9 @@ jobs:
           echo "TAG_VER=$(/usr/local/bin/stoml Trunk.toml extension.version)" >> $GITHUB_OUTPUT
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+        with:
+          image: tonistiigi/binfmt:master
+          platforms: arm64,amd64
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
