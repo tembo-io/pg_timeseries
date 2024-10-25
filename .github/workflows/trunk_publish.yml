@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set -xe
-          sudo apt-get update && sudo apt-get install -y build-essentials ninja-build libpixman-1-dev make wget
+          sudo apt-get update && sudo apt-get install -y build-essential ninja-build libpixman-1-dev make wget
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install stoml
