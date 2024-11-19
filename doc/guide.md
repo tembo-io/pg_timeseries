@@ -458,6 +458,72 @@ WITH rides AS (
 
 The 100th percentile is likely bad data, but the rest is interesting! Most rides are under ten minutes, but one in ten exceeds a half-hour. Putting this in to a `MATERIALIZED VIEW` and refreshing it weekly might make a nice source for an office dashboard or other visualization.
 
+## Using incremental views
+
+On that note, a `MATERIALIZED VIEW` refreshed periodically is a nice idea, but will only reflect reality as often as it is refreshed. `pg_timeseries` includes a better solution: incremental views. The technology underlying this feature is provided by [`pg_ivm`](https://github.com/sraoss/pg_ivm).
+
+First, create a normal `VIEW` for your query. We'll reuse the query about bicycle type from the previous section, but modified to remove the restriction on date (our view should show all ongoing data) and to remove `ORDER BY` (not supported by `pg_ivm`)…
+
+```sql
+CREATE VIEW monthly_type_counts AS
+  SELECT
+    date_trunc('month', started_at)::date AS month,
+    SUM(CASE WHEN rideable_type = 'classic_bike' THEN 1 ELSE 0 END) AS classic,
+    SUM(CASE WHEN rideable_type = 'docked_bike' THEN 1 ELSE 0 END) AS docked,
+    SUM(CASE WHEN rideable_type = 'electric_bike' THEN 1 ELSE 0 END) AS electric
+    FROM divvy_trips
+    GROUP BY month;
+```
+
+Next, we simply call the `make_view_incremental` function. When it returns, our plain `VIEW` will have been changed to point at an incremental view, which `pg_ivm` ensures stays up to date…
+
+```sql
+SELECT make_view_incremental('monthly_type_counts');
+```
+
+`make_view_incremental` rejects views whose queries combine a partitioned table with any other relation, so ensure your queries reference only a single partitioned table. This restriction may be lifted in a future release.
+
+Let's check out our imcremental view…
+
+```sql
+SELECT * FROM monthly_type_counts ORDER BY month DESC LIMIT 1;
+```
+
+```
+┌────────────┬─────────┬────────┬──────────┐
+│   month    │ classic │ docked │ electric │
+├────────────┼─────────┼────────┼──────────┤
+│ 2024-02-01 │    1877 │      0 │     1099 │
+└────────────┴─────────┴────────┴──────────┘
+```
+
+What if we add a docked bicycle ride on Valentine's Day 2024?
+
+```sql
+INSERT INTO divvy_trips (
+    ride_id,
+    rideable_type,
+    started_at,
+    ended_at)
+  VALUES (
+    '1234567890',
+    'docked_bike',
+    '2024-02-14',
+    '2024-02-15');
+
+SELECT * FROM monthly_type_counts ORDER BY month DESC LIMIT 1;
+```
+
+```
+┌────────────┬─────────┬────────┬──────────┐
+│   month    │ classic │ docked │ electric │
+├────────────┼─────────┼────────┼──────────┤
+│ 2024-02-01 │    1877 │      1 │     1099 │
+└────────────┴─────────┴────────┴──────────┘
+```
+
+Nice! The view is updated immediately. _Note: incremental view updates are implemented using triggers, which will impact your write throughtput._ If keeping a view up-to-date is worth this overhead, incremental views are a good solution, but be sure to use them wisely if you are concerned about throughput.
+
 ## Configuring retention
 
 Up until now we've been exploring older data, but in a timeseries system it's usually the case that new data is always being appended to a main table and older data either rolls off to long-term storage or is dropped entirely.
