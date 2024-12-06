@@ -9,7 +9,7 @@ jobs:
   installcheck:
     strategy:
       matrix:
-        pg_version: [14, 15, 16]
+        pg_version: [14, 15, 16, 17]
         os: [ubuntu-latest]
 
     runs-on: ${{matrix.os}}
